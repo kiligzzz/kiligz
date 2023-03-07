@@ -9,25 +9,30 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * 并发管理器
- * <br/>1.线程池 {@link ConcurrentManager#theadPoolMap}
+ * <br/>1.线程池 （{@link ConcurrentManager#theadPoolMap}）
  * <br/>- 支持创建、管理多个四种可命名线程池;
  * <br/>- 添加CountDownLatch任务执行计数，可阻塞等待任务执行、获取结果;
- * <br/>2.阻塞队列 {@link ConcurrentManager#blockingQueueMap}
- * <br/>- 支持创建、管理多个两种阻塞队列;
- * <br/>3.结束标记 {@link ConcurrentManager#endMarkerMap}
+ * <br/>2.线程共享对象 （{@link ConcurrentManager#threadSharedMap})
+ * <br/>- 支持添加、管理、获取线程共享对象
+ * <br/>3.ThreadLocal （{@link ConcurrentManager#threadLocalMap})
+ * <br/>- 支持创建、管理、获取ThreadLocal对象
+ * <br/>4.结束标记 （{@link ConcurrentManager#endMarkerMap})
  * <br/>- 放入、记录、判断结束标记;
- * <br/>4.线程池创建 {@link ThreadPool}
- * <br/>- 线程池使用;
- * <br/>- CountDownLatch;
- * <br/>5.信息记录 {@link ConcurrentManager#infoThreadPoolMap}
- * <br/>6.工具方法 {@link ConcurrentManager#getKey}
+ * <br/>5.线程池创建 （{@link ThreadPool})
+ * <br/>- 线程池的使用;
+ * <br/>- CountDownLatch集成;
+ * <br/>6.当前map信息获取 （{@link ConcurrentManager#infoThreadPoolMap})
+ * <br/>7.工具方法 （{@link ConcurrentManager#getKey})
+ * <br/>（所有异常均未抛出只打印了日志，需抛出则改写）
  *
  * @author Ivan
  */
 @Slf4j
+@SuppressWarnings("unchecked")
 public final class ConcurrentManager {
     /*-------------------------------------------------------------------------*/
     /*--------------------------------- 线程池 ---------------------------------*/
@@ -83,65 +88,53 @@ public final class ConcurrentManager {
 
 
     /*-------------------------------------------------------------------------*/
-    /*-------------------------------- 阻塞队列 --------------------------------*/
+    /*------------------------------ 线程共享对象 -------------------------------*/
     /*-------------------------------------------------------------------------*/
 
-    // 队列名::类名 -> BlockingQueue
-    private static final Map<String, BlockingQueue<?>> blockingQueueMap = new ConcurrentHashMap<>();
-
-    // 队列名::类名 -> TransferQueue
-    private static final Map<String, TransferQueue<?>> transferQueueMap = new ConcurrentHashMap<>();
+    /**
+     * name -> 线程共享对象
+     */
+    private static final Map<String, Object> threadSharedMap = new ConcurrentHashMap<>();
 
     /**
-     * 获取BlockingQueue
+     * 添加线程共享对象
      */
-    @SuppressWarnings("unchecked")
-    public static <T> BlockingQueue<T> getBlockingQueue(String name, Class<T> clazz) {
-        return (BlockingQueue<T>) blockingQueueMap.computeIfAbsent(getKey(name, clazz.getName()),
-                key -> new LinkedBlockingQueue<>());
+    public static  <T> T addThreadShared(String name, T t) {
+        return (T) threadSharedMap.computeIfAbsent(name, key -> t);
     }
 
     /**
-     * 获取TransferQueue
+     * 获取线程共享对象
      */
-    @SuppressWarnings("unchecked")
-    public static <T> TransferQueue<T> getTransferQueue(String name, Class<T> clazz) {
-        return (TransferQueue<T>) transferQueueMap.computeIfAbsent(getKey(name, clazz.getName()),
-                key -> new LinkedTransferQueue<>());
+    public static <T> T addThreadShared(String name) {
+        return (T) threadSharedMap.get(name);
+    }
+
+
+
+    /*-------------------------------------------------------------------------*/
+    /*------------------------------ ThreadLocal ------------------------------*/
+    /*-------------------------------------------------------------------------*/
+
+    /**
+     * threadLocal名 -> ThreadLocal的Map
+     */
+    private static final Map<String, ThreadLocal<?>> threadLocalMap = new ConcurrentHashMap<>();
+
+    /**
+     * 获取ThreadLocal，没有则创建
+     */
+    public static <T> ThreadLocal<T> getThreadLocal(String name) {
+        return getThreadLocal(name, null);
     }
 
     /**
-     * 处理异常的put
+     * 获取ThreadLocal，没有则创建，每次获取调用supplier
      */
-    public static <T> void put(BlockingQueue<T> queue, T t) {
-        try {
-            queue.put(t);
-        } catch (InterruptedException e) {
-            log.error("Interrupted exception while await put {} to {}.", t, queue, e);
-        }
-    }
-
-    /**
-     * 处理异常的transfer
-     */
-    public static <T> void transfer(TransferQueue<T> queue, T t) {
-        try {
-            queue.transfer(t);
-        } catch (InterruptedException e) {
-            log.error("Interrupted exception while await transfer {} to {}.", t, queue, e);
-        }
-    }
-
-    /**
-     * 处理异常的take
-     */
-    public static <T> T take(BlockingQueue<T> queue) {
-        try {
-            return queue.take();
-        } catch (InterruptedException e) {
-            log.error("Interrupted exception while await take from {}.", queue, e);
-        }
-        return null;
+    public static <T> ThreadLocal<T> getThreadLocal(String name, Supplier<T> supplier) {
+        return (ThreadLocal<T>) threadLocalMap.computeIfAbsent(
+                name, key -> supplier == null ?
+                        new ThreadLocal<>() : ThreadLocal.withInitial(supplier));
     }
 
 
@@ -325,15 +318,25 @@ public final class ConcurrentManager {
         /**
          * 添加一组任务到线程池执行，返回一组Future
          */
-        public <T> List<Future<T>> invokeAll(@NonNull List<Callable<T>> taskList) throws InterruptedException {
-            return threadPool.invokeAll(taskList);
+        public <T> List<Future<T>> invokeAll(@NonNull List<Callable<T>> taskList) {
+            try {
+                return threadPool.invokeAll(taskList);
+            } catch (InterruptedException e) {
+                log.error("Interrupted exception while invoke all task.", e);
+            }
+            return null;
         }
 
         /**
          * 添加一组任务到线程池执行，执行任意一个任务返回Future
          */
-        public <T> T invokeAny(@NonNull List<Callable<T>> taskList) throws ExecutionException, InterruptedException {
-            return threadPool.invokeAny(taskList);
+        public <T> T invokeAny(@NonNull List<Callable<T>> taskList) {
+            try {
+                return threadPool.invokeAny(taskList);
+            } catch (InterruptedException | ExecutionException e) {
+                log.error("Interrupted or execution exception while invoke any task.", e);
+            }
+            return null;
         }
 
         /**
@@ -623,17 +626,17 @@ public final class ConcurrentManager {
     }
 
     /**
-     * 获取当前 队列名::类名 的信息
+     * 获取当前 线程共享对象 的信息
      */
-    public static String infoBlockingQueueMap() {
-        return blockingQueueMap.keySet().toString();
+    public static String infoThreadSharedMap() {
+        return threadSharedMap.toString();
     }
 
     /**
-     * 获取当前 队列名::类名 的信息
+     * 获取当前 ThreadLocal 的信息
      */
-    public static String infoTransferQueueMap() {
-        return transferQueueMap.keySet().toString();
+    public static String infoThreadLocalMap() {
+        return threadLocalMap.toString();
     }
 
 
