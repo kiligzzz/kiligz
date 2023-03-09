@@ -1,4 +1,4 @@
-package lucene;
+package com.kiligz.lucene;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenFilter;

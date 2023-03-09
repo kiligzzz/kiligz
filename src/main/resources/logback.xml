@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <!-- 日志文件名 -->
-    <property name="log.name" value="knowledge-optimize"/>
+    <property name="log.name" value="kiligz"/>
     <!-- 日志级别 -->
     <property name="log.level" value="info"/>
     <!-- 日志存放路径 -->
-    <property name="log.path" value="/mssp/logs"/>
+    <property name="log.path" value="./logs"/>
     <!-- 日志保存天数 -->
     <property name="log.save" value="30"/>
     <!-- 日志文件大小 -->

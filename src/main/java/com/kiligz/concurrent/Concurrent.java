@@ -1,39 +1,41 @@
-package concurrent;
+package com.kiligz.concurrent;
 
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.Setter;
+import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
  * 并发管理器
- * <br/>1.线程池 （{@link ConcurrentManager#theadPoolMap}）
- * <br/>- 支持创建、管理多个四种可命名线程池;
- * <br/>- 添加CountDownLatch任务执行计数，可阻塞等待任务执行、获取结果;
- * <br/>2.线程共享对象 （{@link ConcurrentManager#threadSharedMap})
- * <br/>- 支持添加、管理、获取线程共享对象
- * <br/>3.ThreadLocal （{@link ConcurrentManager#threadLocalMap})
- * <br/>- 支持创建、管理、获取ThreadLocal对象
- * <br/>4.结束标记 （{@link ConcurrentManager#endMarkerMap})
- * <br/>- 放入、记录、判断结束标记;
- * <br/>5.线程池创建 （{@link ThreadPool})
- * <br/>- 线程池的使用;
- * <br/>- CountDownLatch集成;
- * <br/>6.当前map信息获取 （{@link ConcurrentManager#infoThreadPoolMap})
- * <br/>7.工具方法 （{@link ConcurrentManager#getKey})
- * <br/>（所有异常均未抛出只打印了日志，需抛出则改写）
+ * <pre>
+ * 1.线程池 --- {@link #theadPoolMap}
+ *   - 支持创建、管理多个四种可命名线程池;
+ *   - 添加CountDownLatch任务执行计数，可阻塞等待所有或指定线程池或任务执行、获取结果;
+ *   - 实现Executor，可供CompletableFuture使用;
+ * 2.线程共享对象 --- {@link #threadSharedMap}
+ *   - 支持添加、管理、获取线程共享对象;
+ * 3.ThreadLocal --- {@link #threadLocalMap}
+ *   - 支持创建、管理ThreadLocal及其值;
+ * 4.结束标记 --- {@link #endMarkerMap}
+ *   - 放入、记录、判断结束标记;
+ * 5.线程池创建 --- {@link ThreadPool}
+ *   - 线程池使用;
+ *   - CountDownLatch;
+ *   - Support;
+ * 6.当前map信息获取 --- {@link #infoThreadPoolMap}
+ * 7.工具方法 --- {@link #getKey}
+ *   - 支持获取一个在当前线程执行任务的Executor对象
+ * （所有异常均未抛出只打印了日志，需抛出则改写）
+ * </pre>
  *
  * @author Ivan
  */
 @Slf4j
 @SuppressWarnings("unchecked")
-public final class ConcurrentManager {
+public final class Concurrent {
     /*-------------------------------------------------------------------------*/
     /*--------------------------------- 线程池 ---------------------------------*/
     /*-------------------------------------------------------------------------*/
@@ -97,16 +99,16 @@ public final class ConcurrentManager {
     private static final Map<String, Object> threadSharedMap = new ConcurrentHashMap<>();
 
     /**
-     * 添加线程共享对象
+     * 刷新线程共享对象
      */
-    public static  <T> T addThreadShared(String name, T t) {
-        return (T) threadSharedMap.computeIfAbsent(name, key -> t);
+    public static <T> void refreshThreadShared(String name, T t) {
+        threadSharedMap.put(name, t);
     }
 
     /**
      * 获取线程共享对象
      */
-    public static <T> T addThreadShared(String name) {
+    public static <T> T getThreadShared(String name) {
         return (T) threadSharedMap.get(name);
     }
 
@@ -122,16 +124,40 @@ public final class ConcurrentManager {
     private static final Map<String, ThreadLocal<?>> threadLocalMap = new ConcurrentHashMap<>();
 
     /**
-     * 获取ThreadLocal，没有则创建
+     * 刷新ThreadLocal，没有则创建，接收给定值
      */
-    public static <T> ThreadLocal<T> getThreadLocal(String name) {
-        return getThreadLocal(name, null);
+    public static <T> void refreshThreadLocal(String name, T t) {
+        getThreadLocal(name, null).set(t);
     }
 
     /**
-     * 获取ThreadLocal，没有则创建，每次获取调用supplier
+     * 刷新ThreadLocal，没有则创建，接收给定supplier
      */
-    public static <T> ThreadLocal<T> getThreadLocal(String name, Supplier<T> supplier) {
+    public static <T> void refreshThreadLocal(String name, Supplier<T> initial) {
+        getThreadLocal(name, initial);
+    }
+
+    /**
+     * 获取ThreadLocal值
+     */
+    public static <T> T getThreadLocalValue(String name) {
+        return (T) getThreadLocal(name, null).get();
+    }
+
+    /**
+     * 删除ThreadLocal
+     */
+    public static void removeThreadLocal(String name) {
+        ThreadLocal<?> threadLocal = threadLocalMap.remove(name);
+        if (threadLocal != null) {
+            threadLocal.remove();
+        }
+    }
+
+    /**
+     * 获取ThreadLocal，没有则创建，每次获取调用supplier（若不为null）
+     */
+    private static <T> ThreadLocal<T> getThreadLocal(String name, Supplier<T> supplier) {
         return (ThreadLocal<T>) threadLocalMap.computeIfAbsent(
                 name, key -> supplier == null ?
                         new ThreadLocal<>() : ThreadLocal.withInitial(supplier));
@@ -147,14 +173,27 @@ public final class ConcurrentManager {
     private static final Map<Queue<?>, Object> endMarkerMap = new ConcurrentHashMap<>();
 
     /**
-     * 往队列末尾put指定个结束标记，末尾可接收一个数字
+     * 往队列末尾put一个结束标记
      */
-    public static <T> void putEnd(BlockingQueue<T> queue, T endMarker, long... countFirst) {
+    public static <T> void putEnd(BlockingQueue<T> queue, T endMarker) {
+        putEnd(queue, endMarker, 1);
+    }
+
+    /**
+     * 往队列末尾transfer一个结束标记
+     */
+    public static <T> void transferEnd(TransferQueue<T> queue, T endMarker) {
+        transferEnd(queue, endMarker, 1);
+    }
+
+    /**
+     * 往队列末尾put指定个结束标记
+     */
+    public static <T> void putEnd(BlockingQueue<T> queue, T endMarker, long count) {
         try {
             // 记录结束标记
             endMarkerMap.put(queue, endMarker);
             // 放入queue
-            long count = countFirst.length == 0 ? 1 : countFirst[0];
             for (long i = 0; i < count; i++) {
                 queue.put(endMarker);
             }
@@ -164,14 +203,13 @@ public final class ConcurrentManager {
     }
 
     /**
-     * 往队列末尾transfer一个结束标记，末尾可接收一个数字
+     * 往队列末尾transfer指定个结束标记
      */
-    public static <T> void transferEnd(TransferQueue<T> queue, T endMarker, long... countFirst) {
+    public static <T> void transferEnd(TransferQueue<T> queue, T endMarker, long count) {
         try {
             // 记录结束标记
             endMarkerMap.put(queue, endMarker);
             // 放入queue
-            long count = countFirst.length == 0 ? 1 : countFirst[0];
             for (long i = 0; i < count; i++) {
                 queue.transfer(endMarker);
             }
@@ -183,9 +221,16 @@ public final class ConcurrentManager {
     /**
      * 是否是队列的结束标记
      */
-    public static <T> boolean isEndMarker(Queue<T> queue, T obj) {
+    public static <T> boolean isEnd(Queue<T> queue, T obj) {
         Object endMarker = endMarkerMap.get(queue);
         return endMarker != null && endMarker == obj;
+    }
+
+    /**
+     * 清除队列对应的结束标记
+     */
+    public static <T> void clearEnd(Queue<T> queue) {
+        endMarkerMap.remove(queue);
     }
 
 
@@ -195,19 +240,19 @@ public final class ConcurrentManager {
     /*-------------------------------------------------------------------------*/
 
     /**
-     * 线程池封装类
+     * 线程池装饰类
      */
-    public static class ThreadPool {
+    public static class ThreadPool implements Executor {
         @Getter
         private final String name;
         @Getter
         private final String type;
-        private final ThreadPoolExecutor threadPool;
+        private final ThreadPoolExecutor executor;
 
-        private ThreadPool(String name, String type, ThreadPoolExecutor threadPool) {
+        private ThreadPool(String name, String type, ThreadPoolExecutor executor) {
             this.name = name;
             this.type = type;
-            this.threadPool = threadPool;
+            this.executor = executor;
         }
 
         @Override
@@ -223,14 +268,14 @@ public final class ConcurrentManager {
          * 获取原始线程池
          */
         public ThreadPoolExecutor getOriginInstance() {
-            return threadPool;
+            return executor;
         }
 
         /**
          * 关闭线程池，并且丢弃记录
          */
         public void shutdownAndDiscard() {
-            threadPool.shutdown();
+            executor.shutdown();
             theadPoolMap.remove(getKey(name, type));
         }
 
@@ -249,31 +294,16 @@ public final class ConcurrentManager {
          * 返回线程池是否是关闭状态
          */
         public boolean isShutdown() {
-            return threadPool.isShutdown();
+            return executor.isShutdown();
         }
 
-
         /**
-         * 任务代理，增加countDownLatch执行计数，增加错误日志
+         * 添加一个任务到线程池中执行
+         * 若需指定该任务await，使用{@link ThreadPool#execute(java.lang.Runnable, int)}
          */
-        private final Function<Runnable, Runnable> taskProxy = originTask -> () -> {
-            try {
-                originTask.run();
-            } catch (Exception e) {
-                log.error("Task run error.", e);
-            } finally {
-                // 添加任务执行完成计数
-                countDown(originTask);
-            }
-        };
-
-        /**
-         * 添加一个任务到线程池中执行，返回原始task，可用来await
-         */
-        public Runnable execute(@NonNull Runnable task) {
+        public void execute(@NonNull Runnable task) {
             latchMap.put(task, new CountDownLatch(1));
-            threadPool.execute(taskProxy.apply(task));
-            return task;
+            executor.execute(decorate(task));
         }
 
         /**
@@ -281,9 +311,10 @@ public final class ConcurrentManager {
          */
         public Runnable execute(@NonNull Runnable task, int taskCount) {
             latchMap.put(task, new CountDownLatch(taskCount));
-            Runnable proxyTask = taskProxy.apply(task);
+
+            Runnable decorator = decorate(task);
             for (int i = 0; i < taskCount; i++) {
-                threadPool.execute(proxyTask);
+                executor.execute(decorator);
             }
             return task;
         }
@@ -292,27 +323,11 @@ public final class ConcurrentManager {
          * 添加一个任务到线程池中执行，返回Future
          */
         public <T> RunnableFuture<T> submit(@NonNull Callable<T> task) {
-            RunnableFuture<T> runnableFuture = new FutureTask<>(task);
-
+            RunnableFuture<T> runnableFuture = new FutureTaskDecorator<>(task);
             latchMap.put(runnableFuture, new CountDownLatch(1));
-            threadPool.execute(taskProxy.apply(runnableFuture));
+
+            executor.execute(new RunnableDecorator(runnableFuture));
             return runnableFuture;
-        }
-
-        /**
-         * 添加taskCount个任务到线程池执行，返回一组Future
-         */
-        public <T> List<RunnableFuture<T>> submit(@NonNull Callable<T> task, int taskCount) {
-            List<RunnableFuture<T>> futureList = new ArrayList<>();
-            RunnableFuture<T> runnableFuture = new FutureTask<>(task);
-
-            latchMap.put(runnableFuture, new CountDownLatch(taskCount));
-            Runnable proxyTask = taskProxy.apply(runnableFuture);
-            for (int i = 0; i < taskCount; i++) {
-                threadPool.execute(proxyTask);
-                futureList.add(runnableFuture);
-            }
-            return futureList;
         }
 
         /**
@@ -320,7 +335,7 @@ public final class ConcurrentManager {
          */
         public <T> List<Future<T>> invokeAll(@NonNull List<Callable<T>> taskList) {
             try {
-                return threadPool.invokeAll(taskList);
+                return executor.invokeAll(taskList);
             } catch (InterruptedException e) {
                 log.error("Interrupted exception while invoke all task.", e);
             }
@@ -328,11 +343,11 @@ public final class ConcurrentManager {
         }
 
         /**
-         * 添加一组任务到线程池执行，执行任意一个任务返回Future
+         * 添加一组任务到线程池执行，任意一个任务返回结果
          */
         public <T> T invokeAny(@NonNull List<Callable<T>> taskList) {
             try {
-                return threadPool.invokeAny(taskList);
+                return executor.invokeAny(taskList);
             } catch (InterruptedException | ExecutionException e) {
                 log.error("Interrupted or execution exception while invoke any task.", e);
             }
@@ -345,7 +360,9 @@ public final class ConcurrentManager {
         public Runnable schedule(@NonNull Runnable task, long delay, @NonNull TimeUnit unit) {
             try {
                 latchMap.put(task, new CountDownLatch(1));
-                ((ScheduledThreadPoolExecutor) threadPool).schedule(taskProxy.apply(task), delay, unit);
+
+                ((ScheduledThreadPoolExecutor) executor).schedule(
+                        decorate(task), delay, unit);
             } catch (ClassCastException e) {
                 log.error("This threadPool is not a scheduledThreadPool, please checked it.", e);
             }
@@ -358,10 +375,11 @@ public final class ConcurrentManager {
         public Runnable schedule(@NonNull Runnable task, int taskCount, long delay, @NonNull TimeUnit unit) {
             try {
                 latchMap.put(task, new CountDownLatch(taskCount));
-                Runnable proxyTask = taskProxy.apply(task);
-                ScheduledThreadPoolExecutor scheduledThreadPool = (ScheduledThreadPoolExecutor) threadPool;
+
+                Runnable decorator = decorate(task);
+                ScheduledThreadPoolExecutor scheduledThreadPool = (ScheduledThreadPoolExecutor) executor;
                 for (int i = 0; i < taskCount; i++) {
-                    scheduledThreadPool.schedule(proxyTask, delay, unit);
+                    scheduledThreadPool.schedule(decorator, delay, unit);
                 }
             } catch (ClassCastException e) {
                 log.error("This threadPool is not a scheduledThreadPool, please checked it.", e);
@@ -375,7 +393,9 @@ public final class ConcurrentManager {
         public Runnable scheduleAtFixedRate(@NonNull Runnable task, long delay, long period, @NonNull TimeUnit unit) {
             try {
                 latchMap.put(task, new CountDownLatch(1));
-                ((ScheduledThreadPoolExecutor) threadPool).scheduleAtFixedRate(taskProxy.apply(task), delay, period, unit);
+
+                ((ScheduledThreadPoolExecutor) executor).scheduleAtFixedRate(
+                        decorate(task), delay, period, unit);
             } catch (ClassCastException e) {
                 log.error("This threadPool is not a scheduledThreadPool, please checked it.", e);
             }
@@ -388,15 +408,52 @@ public final class ConcurrentManager {
         public Runnable scheduleAtFixedRate(@NonNull Runnable task, int taskCount, long delay, long period, @NonNull TimeUnit unit) {
             try {
                 latchMap.put(task, new CountDownLatch(taskCount));
-                Runnable proxyTask = taskProxy.apply(task);
-                ScheduledThreadPoolExecutor scheduledThreadPool = (ScheduledThreadPoolExecutor) threadPool;
+
+                Runnable decorator = decorate(task);
+                ScheduledThreadPoolExecutor scheduledThreadPool = (ScheduledThreadPoolExecutor) executor;
                 for (int i = 0; i < taskCount; i++) {
-                    scheduledThreadPool.scheduleAtFixedRate(proxyTask, delay, period, unit);
+                    scheduledThreadPool.scheduleAtFixedRate(decorator, delay, period, unit);
                 }
             } catch (ClassCastException e) {
                 log.error("This threadPool is not a scheduledThreadPool, please checked it.", e);
             }
             return task;
+        }
+
+        /**
+         * 返回Runnable装饰器，增加任务执行完成计数功能
+         */
+        private Runnable decorate(Runnable origin) {
+            return new RunnableDecorator(origin);
+        }
+
+        /**
+         * Runnable装饰器，增加任务执行完成计数功能
+         */
+        @AllArgsConstructor
+        private class RunnableDecorator implements Runnable {
+            Runnable origin;
+
+            @Override
+            public void run() {
+                try {
+                    origin.run();
+                } finally {
+                    countDown(origin);
+                }
+            }
+        }
+
+        /**
+         * FutureTask装饰器，增加获取原始任务名称功能
+         */
+        private static class FutureTaskDecorator<T> extends FutureTask<T> {
+            Callable<T> origin;
+
+            public FutureTaskDecorator(Callable<T> callable) {
+                super(callable);
+                origin = callable;
+            }
         }
 
 
@@ -409,16 +466,23 @@ public final class ConcurrentManager {
         private final Map<Runnable, CountDownLatch> latchMap = new ConcurrentHashMap<>();
 
         /**
-         * 获取当前 任务 -> CountDownLatch 的信息
+         * 获取当前 任务 -> count 的信息
          */
         public String infoLatchMap() {
-            return latchMap.toString();
+            Map<String, Long> taskNameToCountMap = new HashMap<>();
+            latchMap.forEach((k, v) -> {
+                String taskName = k instanceof FutureTaskDecorator ?
+                        getSimpleName(((FutureTaskDecorator<?>) k).origin) :
+                        getSimpleName(k);
+                taskNameToCountMap.put(taskName, v.getCount());
+            });
+            return taskNameToCountMap.toString();
         }
 
         /**
          * 任务未完成数-1
          */
-        public void countDown(@NonNull Runnable task) {
+        private void countDown(@NonNull Runnable task) {
             // 若countDownLatch为0时删除，不为0时返回
             latchMap.computeIfPresent(task, (k, v) -> {
                 v.countDown();
@@ -457,8 +521,9 @@ public final class ConcurrentManager {
          */
         public void await(@NonNull Runnable task) {
             try {
-                if (!latchMap.containsKey(task)) return;
-                latchMap.get(task).await();
+                CountDownLatch latch = latchMap.get(task);
+                if (latch != null)
+                    latch.await();
             } catch (InterruptedException e) {
                 log.error("Interrupted exception while await {}.", task, e);
             }
@@ -469,8 +534,8 @@ public final class ConcurrentManager {
          */
         public boolean await(@NonNull Runnable task, long timeout, TimeUnit unit) {
             try {
-                return !latchMap.containsKey(task) ||
-                        latchMap.get(task).await(timeout, unit);
+                CountDownLatch latch = latchMap.get(task);
+                return latch == null || latch.await(timeout, unit);
             } catch (InterruptedException e) {
                 log.error("Interrupted exception while timeout await {}.", task, e);
             }
@@ -492,6 +557,9 @@ public final class ConcurrentManager {
         }
     }
 
+
+
+    /*------------------------------ Support ------------------------------*/
 
     /**
      * 线程池 类型 -> 创建方法 枚举类
@@ -617,7 +685,7 @@ public final class ConcurrentManager {
     }
 
     /**
-     * 获取所有线程池的latchInfo
+     * 获取当前所有线程池的latchInfo
      */
     public static Map<String, String> infoLatchInfoMap() {
         Map<String, String> latchInfoMap = new HashMap<>();
@@ -639,6 +707,15 @@ public final class ConcurrentManager {
         return threadLocalMap.toString();
     }
 
+    /**
+     * 获取当前 结束标记 的信息
+     */
+    public static String infoEndMarkerMap() {
+        Map<String, Object> idToEndMarkerMap = new HashMap<>();
+        endMarkerMap.forEach((k, v) -> idToEndMarkerMap.put(getSimpleName(k), v));
+        return idToEndMarkerMap.toString();
+    }
+
 
 
     /*-------------------------------------------------------------------------*/
@@ -651,9 +728,23 @@ public final class ConcurrentManager {
     private static String getKey(String prefix, String suffix) {
         return prefix + "::" + suffix;
     }
+    
+    /**
+     * 获取类的简名
+     */
+    private static String getSimpleName(Object obj) {
+        return obj.getClass().getSimpleName();
+    }
 
     /**
-     * 处理异常的sleep
+     * 返回一个Executor对象，该对象直接在当前线程执行任务，不会创建新线程
+     */
+    public static Executor directExecutor() {
+        return Runnable::run;
+    }
+
+    /**
+     * sleep
      */
     public static void sleep(long milli) {
         try {

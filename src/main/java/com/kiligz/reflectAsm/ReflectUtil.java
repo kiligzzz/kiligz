@@ -1,4 +1,4 @@
-package reflectAsm;
+package com.kiligz.reflectAsm;
 
 import com.esotericsoftware.reflectasm.FieldAccess;
 import com.esotericsoftware.reflectasm.MethodAccess;

@@ -1,4 +1,4 @@
-package reflectAsm;
+package com.kiligz.reflectAsm;
 
 import com.esotericsoftware.reflectasm.MethodAccess;
 import com.google.common.collect.Maps;

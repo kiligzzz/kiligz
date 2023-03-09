@@ -1,4 +1,4 @@
-package spring;
+package com.kiligz.spring;
 
 import lombok.NonNull;
 import org.springframework.beans.BeansException;

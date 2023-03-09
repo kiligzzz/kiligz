@@ -1,4 +1,4 @@
-package designPattern;
+package com.kiligz.designPattern;
 
 import java.io.*;
 import java.util.HashMap;

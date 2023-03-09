@@ -1,4 +1,4 @@
-package trie;
+package com.kiligz.trie;
 
 import com.hankcs.hanlp.collection.trie.DoubleArrayTrie;
 

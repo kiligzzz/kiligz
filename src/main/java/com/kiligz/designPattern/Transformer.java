@@ -1,4 +1,4 @@
-package designPattern;
+package com.kiligz.designPattern;
 
 /**
  * 转换器抽象类
