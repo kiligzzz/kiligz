@@ -2,6 +2,7 @@ package com.kiligz.designPattern;
 
 /**
  * 转换器抽象类
+ * 责任链模式
  *
  * 使用：
  * Transformer transformer = Transformer.chain(
