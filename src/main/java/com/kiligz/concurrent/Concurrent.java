@@ -1,5 +1,6 @@
 package com.kiligz.concurrent;
 
+import com.alibaba.ttl.TransmittableThreadLocal;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 
@@ -19,6 +20,7 @@ import java.util.function.Supplier;
  *   - 支持添加、管理、获取线程共享对象;
  * 3.ThreadLocal --- {@link #threadLocalMap}
  *   - 支持创建、管理ThreadLocal及其值;
+ *   - 若需在线程池中使用则依赖TransmittableThreadLocal，同时包装线程池
  * 4.结束标记 --- {@link #endMarkerMap}
  *   - 放入、记录、判断结束标记;
  * 5.线程池创建 --- {@link ThreadPool}
@@ -162,6 +164,29 @@ public final class Concurrent {
                 name, key -> supplier == null ?
                         new ThreadLocal<>() : ThreadLocal.withInitial(supplier));
     }
+
+//    /**
+//     * 刷新TransmittableThreadLocal，没有则创建，接收给定值
+//     */
+//    public static <T> void refreshTransmittableThreadLocal(String name, T t) {
+//        getThreadLocal(name, null).set(t);
+//    }
+//
+//    /**
+//     * 刷新TransmittableThreadLocal，没有则创建，接收给定supplier
+//     */
+//    public static <T> void refreshTransmittableThreadLocal(String name, Supplier<T> initial) {
+//        getThreadLocal(name, initial);
+//    }
+//
+//    /**
+//     * 获取TransmittableThreadLocal，没有则创建，每次获取调用supplier（若不为null）
+//     */
+//    private static <T> ThreadLocal<T> getTransmittableThreadLocal(String name, Supplier<T> supplier) {
+//        return (ThreadLocal<T>) threadLocalMap.computeIfAbsent(
+//                name, key -> supplier == null ?
+//                        new TransmittableThreadLocal<>() : TransmittableThreadLocal.withInitial(supplier));
+//    }
 
 
 

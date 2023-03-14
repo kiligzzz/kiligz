@@ -17,18 +17,19 @@
    - 添加CountDownLatch任务执行计数，可阻塞等待所有或指定线程池或任务执行、获取结果;
    - 实现Executor，可供CompletableFuture使用;
 2. 线程共享对象
-      - 支持添加、管理、获取线程共享对象;
+   - 支持添加、管理、获取线程共享对象;
 3. ThreadLocal
-         - 支持创建、管理ThreadLocal及其值;
+   - 支持创建、管理ThreadLocal及其值;
+   - 若需在线程池中使用则依赖TransmittableThreadLocal，同时包装线程池
 4. 结束标记
-         - 放入、记录、判断结束标记;
+   - 放入、记录、判断结束标记;
 5. 线程池创建
-         - 线程池使用;
-         - CountDownLatch;
-         - Support;
+   - 线程池使用;
+   - CountDownLatch;
+   - Support;
 6. 当前map信息获取
 7. 工具方法
-           - 支持获取一个在当前线程执行任务的Executor对象
+   - 支持获取一个在当前线程执行任务的Executor对象
 
 
 
@@ -40,6 +41,3 @@
 
 > TransmittableThreadLocal、Trace对象、http拦截器、rpc过滤器、重写MDCAdapter等实现
 
-
-
-DAT
