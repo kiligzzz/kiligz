@@ -1,10 +1,11 @@
-package com.kiligz.trace.domain;
+package com.kiligz.trace;
 
 import com.alibaba.ttl.TransmittableThreadLocal;
 import com.kiligz.uuid.UUID;
 import lombok.Data;
 import org.slf4j.MDC;
 
+import java.io.Serializable;
 import java.time.Instant;
 
 /**
@@ -14,9 +15,13 @@ import java.time.Instant;
  * @since 2023/3/10
  */
 @Data
-public class Trace {
+public class Trace implements Serializable {
     // 可传播的ThreadLocal
     private static final ThreadLocal<Trace> THREAD_LOCAL = new TransmittableThreadLocal<>();
+    // trace的key
+    public static final String KEY = "trace";
+
+
     // 全局唯一
     private String traceId;
     // 服务唯一
@@ -91,7 +96,7 @@ public class Trace {
      */
     public static void remove() {
         THREAD_LOCAL.remove();
-        MDC.clear();
+        clearMDC();
     }
 
     /**
@@ -104,7 +109,7 @@ public class Trace {
     /**
      * 放入MDC，用于日志打印
      */
-    public static void putMDC(Trace trace) {
+    private static void putMDC(Trace trace) {
         MDC.put("traceId", trace.traceId);
         MDC.put("spanId", trace.spanId);
     }
@@ -112,7 +117,7 @@ public class Trace {
     /**
      * 清空MDC
      */
-    public static void clearMDC() {
+    private static void clearMDC() {
         MDC.clear();
     }
 }

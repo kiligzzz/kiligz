@@ -1,10 +1,7 @@
 package com.kiligz.trace;
 
 import com.alibaba.ttl.threadpool.TtlExecutors;
-import com.google.common.collect.TreeMultimap;
 import com.kiligz.concurrent.Concurrent;
-import com.kiligz.trace.domain.Trace;
-import lombok.extern.log4j.Log4j2;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -12,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.concurrent.Executor;
 
 /**
- * 分布式异步日志全链路追踪
+ * 分布式异步全链路追踪
  * TransmittableThreadLocal、Trace对象、拦截器、过滤器、重写MDCAdapter等实现
  *
  * @author Ivan
