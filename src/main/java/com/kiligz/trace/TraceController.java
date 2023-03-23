@@ -1,7 +1,7 @@
 package com.kiligz.trace;
 
 import com.alibaba.ttl.threadpool.TtlExecutors;
-import com.kiligz.concurrent.Concurrent;
+import com.kiligz.concurrent.Concurrents;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,7 +21,7 @@ public class TraceController {
     private static final Executor traceExecutor =
             // 先拷贝到任务线程，执行完后再将值拷贝回去（CopyOnWrite思想）
             TtlExecutors.getTtlExecutor(
-                    Concurrent.getFixedThreadPool("trace"));
+                    Concurrents.getFixedThreadPool("trace"));
 
     @GetMapping("trace")
     public void trace() {

@@ -1,6 +1,5 @@
 package com.kiligz.concurrent;
 
-import com.alibaba.ttl.TransmittableThreadLocal;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 
@@ -37,7 +36,7 @@ import java.util.function.Supplier;
  */
 @Slf4j
 @SuppressWarnings("unchecked")
-public final class Concurrent {
+public final class Concurrents {
     /*-------------------------------------------------------------------------*/
     /*--------------------------------- 线程池 ---------------------------------*/
     /*-------------------------------------------------------------------------*/
