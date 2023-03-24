@@ -8,7 +8,7 @@
 
 > 包含并发管理器、唯一标识、计时器、git等
 
-### [Concurrent](src/main/java/com/kiligz/concurrent/Concurrent.java)
+### [Concurrents](src/main/java/com/kiligz/concurrent/Concurrents.java)
 
 > 并发管理器
 
@@ -30,6 +30,16 @@
 6. 当前map信息获取
 7. 工具方法
    - 支持获取一个在当前线程执行任务的Executor对象
+
+
+
+### [NacosUtil](src/main/java/com/kiligz/nacos/NacosUtil.java)
+
+> 用于实时获取nacos上的配置，并转换为相应格式
+
+   1. 懒汉式单例获取配置，第一次调用时初始化、获取、格式化，不会重复
+   2. 监听nacos上的配置，发生变化实时更新
+   3. 若更新时出错，则放弃本次更新，使用上次正常更新时的配置
 
 
 
