@@ -16,7 +16,7 @@ public class Dijkstra<T> {
     public static final int DEFAULT_WEIGHT = 10;
 
     /**
-     * 图
+     * 图，节点 -> （目标节点 -> 到目标节点的权重）
      */
     private final Map<T, Map<T, Integer>> graph;
 
