@@ -1,4 +1,4 @@
-package com.kiligz.trace;
+package com.kiligz.trace.domain;
 
 import com.alibaba.ttl.TransmittableThreadLocal;
 import com.kiligz.uuid.UUID;
@@ -96,7 +96,7 @@ public class Trace implements Serializable {
      */
     public static void remove() {
         THREAD_LOCAL.remove();
-        clearMDC();
+        MDC.clear();
     }
 
     /**

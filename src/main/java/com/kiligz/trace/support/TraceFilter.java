@@ -1,5 +1,6 @@
-//package com.kiligz.trace;
+//package com.kiligz.trace.support;
 //
+//import com.kiligz.kzp.trace.domain.Trace;
 //import org.apache.dubbo.common.constants.CommonConstants;
 //import org.apache.dubbo.common.extension.Activate;
 //import org.apache.dubbo.rpc.*;
@@ -25,12 +26,12 @@
 //        try {
 //            if (isProviderSide) {
 //                // 从调用端Rpc上下文中获取
-//                com.kiligz.kzp.rpc.trace.Trace trace = (com.kiligz.kzp.rpc.trace.Trace) caller.getObjectAttachment(com.kiligz.kzp.rpc.trace.Trace.KEY);
+//                Trace trace = (Trace) caller.getObjectAttachment(Trace.KEY);
 //                // 更新当前服务的trace
-//                com.kiligz.kzp.rpc.trace.Trace.refresh(trace);
+//                Trace.refresh(trace);
 //            } else {
 //                // 将trace放入当前服务Rpc上下文
-//                self.setAttachment(com.kiligz.kzp.rpc.trace.Trace.KEY, com.kiligz.kzp.rpc.trace.Trace.get());
+//                self.setAttachment(Trace.KEY, Trace.get());
 //            }
 //
 //            // 继续执行之后逻辑
@@ -38,7 +39,7 @@
 //        } finally {
 //            if (isProviderSide) {
 //                // 清空ThreadLocal
-//                com.kiligz.kzp.rpc.trace.Trace.remove();
+//                Trace.remove();
 //            } else {
 //                // 清空当前服务Rpc上下文
 //                self.clearAttachments();

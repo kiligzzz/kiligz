@@ -1,5 +1,6 @@
-package com.kiligz.trace;
+package com.kiligz.trace.support;
 
+import com.kiligz.trace.domain.Trace;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
