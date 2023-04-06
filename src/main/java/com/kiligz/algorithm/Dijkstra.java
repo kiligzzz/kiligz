@@ -3,7 +3,7 @@ package com.kiligz.algorithm;
 import java.util.*;
 
 /**
- * Dijkstra算法（基于边）
+ * Dijkstra算法
  * 求最短路径
  *
  * @author Ivan
@@ -13,7 +13,7 @@ public class Dijkstra {
     /**
      * 默认权重
      */
-    public static final int DEFAULT_WEIGHT = 1;
+    public static final int DEFAULT_WEIGHT = 10;
 
     /**
      * 图，节点 -> （目标节点 -> 到目标节点的权重）
@@ -29,24 +29,8 @@ public class Dijkstra {
     }
 
     /**
-     * 删除边
+     * 根据边数画出默认图
      */
-    public void removeEdge(int source, int dest, int weight) {
-        graph.get(source).remove(dest, weight);
-    }
-
-    /**
-     * 1. 图加入特定边（peekSource,peekDest,weight）
-     * 2. 求节点（source）到节点（dest）的最短路径
-     * 3. 将图恢复原样
-     */
-    public int peekShortest(int source, int dest, int peekSource, int peekDest, int weight) {
-        addEdge(peekSource, peekDest, weight);
-        Integer shortest = shortestPath(source, dest);
-        removeEdge(peekSource, peekDest, weight);
-        return shortest;
-    }
-
     public static Dijkstra drawGraph(int edgeCount) {
         Dijkstra dijkstra = new Dijkstra();
         for (int i = 0; i < edgeCount; i++) {
@@ -56,48 +40,47 @@ public class Dijkstra {
     }
 
     /**
-     * 到指定目标节点的最短路径
+     * 最短路径
      */
-    public Integer shortestPath(Integer source, Integer dest) {
-        return shortestPath(source).get(dest);
-    }
-
-    /**
-     * 所有目标节点的最短路径
-     */
-    public Map<Integer, Integer> shortestPath(Integer source) {
-        // 目标节点 -> 源节点到目标节点的距离
+    public List<Integer> shortestPath(int source, int dest) {
         Map<Integer, Integer> destToDistanceMap = new HashMap<>();
-        // 已经遍历过的节点
-        Set<Integer> visited = new HashSet<>();
-        // 目标节点优先队列，按源节点到目标点的距离从小到大排
+        Map<Integer, Integer> nodeToPrevMap = new HashMap<>();
         PriorityQueue<Integer> queue = new PriorityQueue<>(Comparator.comparingInt(destToDistanceMap::get));
+        Set<Integer> visited = new HashSet<>();
 
         // 初始化
         destToDistanceMap.put(source, 0);
         queue.add(source);
 
-        // 循环直到graph遍历完
+        // 计算最短路径
         while (!queue.isEmpty()) {
             Integer cur = queue.poll();
-            if (!visited.add(cur)) continue;
+            if (cur.equals(dest)) break;
+            visited.add(cur);
 
-            // 目标节点 -> 当前节点到目标节点的权重
-            Map<Integer, Integer> destToWeightMap = graph.getOrDefault(cur, new HashMap<>());
-            destToWeightMap.forEach((dest, weight) -> {
-                // 当前节点到新目标节点的距离
-                int newDistance = destToDistanceMap.get(cur) + weight;
-
-                // 记录最短路径
-                Integer oldDistance = destToDistanceMap.get(dest);
-                if (oldDistance == null || oldDistance > newDistance) {
-                    destToDistanceMap.put(dest, newDistance);
-                    queue.add(dest);
+            graph.get(cur).forEach((node, weight) -> {
+                if (!visited.contains(node)) {
+                    Integer newDistance = destToDistanceMap.get(cur) + weight;
+                    Integer oldDistance = destToDistanceMap.get(node);
+                    if (oldDistance == null || newDistance < oldDistance) {
+                        destToDistanceMap.put(node, newDistance);
+                        nodeToPrevMap.put(node, cur);
+                        queue.add(node);
+                    }
                 }
             });
         }
 
-        return destToDistanceMap;
-    }
+        // 构造路径
+        List<Integer> path = new ArrayList<>();
+        Integer cur = dest;
+        while (nodeToPrevMap.containsKey(cur)) {
+            path.add(cur);
+            cur = nodeToPrevMap.get(cur);
+        }
+        path.add(source);
+        Collections.reverse(path);
 
+        return path;
+    }
 }
