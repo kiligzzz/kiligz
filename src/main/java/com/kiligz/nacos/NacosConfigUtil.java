@@ -3,6 +3,7 @@ package com.kiligz.nacos;
 import com.alibaba.nacos.api.NacosFactory;
 import com.alibaba.nacos.api.config.ConfigService;
 import com.alibaba.nacos.api.config.listener.AbstractListener;
+import com.alibaba.nacos.api.exception.NacosException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,9 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Nacos工具类（用于实时获取nacos上的配置，并转换为相应格式）
@@ -30,19 +30,17 @@ import java.util.Properties;
 @Slf4j
 @Component
 @SuppressWarnings("all")
-public class NacosUtil {
+public class NacosConfigUtil {
     /**
      * dataId枚举 -> obj的map
      */
-    private static final Map<DataId, Object> dataIdToValueMap = new HashMap<>();
+    private static final Map<DataId, Object> dataIdToValueMap = new ConcurrentHashMap<>();
 
     @Value("${spring.cloud.nacos.server-addr}")
-    private String serverAddr;
+    private static String serverAddr;
 
     @Value("${spring.cloud.nacos.config.group}")
-    private String group;
-
-    private ConfigService configService;
+    private static String group;
 
     /**
      * 获取nacos配置可直接访问的url
@@ -55,41 +53,25 @@ public class NacosUtil {
      * 获取dataId对应的对象
      */
     private static Object get(DataId dataId) {
-        return SpringUtil.getBean(NacosUtil.class).lazyGet(dataId);
+        return SpringUtil.getBean(NacosConfigUtil.class).lazyGet(dataId);
     }
 
     /**
      * 从dataIdToValueMap中获取值（懒汉式单例获取）
      */
     private Object lazyGet(DataId dataId) {
-        try {
-            // 双重检查configService，只需初始化一次configService
-            if (configService == null) {
-                synchronized (NacosUtil.class) {
-                    if (configService == null) {
-                        Properties properties = new Properties();
-                        properties.put("serverAddr", serverAddr);
-                        configService = NacosFactory.createConfigService(properties);
-                    }
-                }
+        // 保证只放入一次 且 只添加一次监听器
+        dataIdToValueMap.computeIfAbsent(dataId, key -> {
+            try {
+                // 获取配置
+                String content = getConfigService().getConfig(dataId.dataId, group, 5000);
+                // 添加监听器，若发生改变则刷新
+                getConfigService().addListener(dataId.dataId, group, new NacosListener(dataId));
+                return key.convert(content);
+            } catch (Exception e) {
+                throw new RuntimeException();
             }
-
-            // 双重检查dataId是否已经获取
-            if (!dataIdToValueMap.containsKey(dataId)) {
-                synchronized (dataIdToValueMap) {
-                    if (!dataIdToValueMap.containsKey(dataId)) {
-                        // 获取配置
-                        String content = configService.getConfig(dataId.dataId, group, 5000);
-                        // 添加监听器，若发生改变则刷新
-                        configService.addListener(dataId.dataId, group, new NacosListener(dataId));
-
-                        dataIdToValueMap.put(dataId, dataId.convert(content));
-                    }
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        });
         return dataIdToValueMap.get(dataId);
     }
 
@@ -98,7 +80,7 @@ public class NacosUtil {
      * nacos监听器
      */
     @AllArgsConstructor
-    private class NacosListener extends AbstractListener {
+    private static class NacosListener extends AbstractListener {
         private final DataId dataId;
 
         @Override
@@ -112,6 +94,27 @@ public class NacosUtil {
         }
     }
 
+    /**
+     * 单例获取ConfigService
+     */
+    public static ConfigService getConfigService() {
+        return ConfigServiceHolder.instance;
+    }
+
+    /**
+     * 静态内部类持有ConfigService
+     */
+    private static class ConfigServiceHolder {
+        private static final ConfigService instance;
+        
+        static {
+            try {
+                instance = NacosFactory.createConfigService(serverAddr);
+            } catch (NacosException e) {
+                throw new RuntimeException();
+            }
+        }
+    }
 
     /**
      * dataId的枚举
@@ -130,7 +133,7 @@ public class NacosUtil {
          */
         TypeReference typeReference;
 
-        static ObjectMapper mapper = new ObjectMapper();
+        static ObjectMapper mapper;
 
         /**
          * 转换为指定类型
