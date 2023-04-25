@@ -11,7 +11,7 @@ import java.util.Map;
  * @author Ivan
  * @since 2023/3/8
  */
-public class Timing {
+public abstract class Timing {
     /**
      * 线程id -> 开始时间 的map
      */

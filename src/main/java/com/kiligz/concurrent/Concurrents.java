@@ -1,9 +1,15 @@
-package com.kiligz.concurrent;
+package com.kiligz.kzp.common.utils;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -11,16 +17,16 @@ import java.util.function.Supplier;
 /**
  * 并发管理器
  * <pre>
- * 1.线程池 --- {@link #theadPoolMap}
+ * 1.线程池 --- {@link #THREAD_POOL_MAP}
  *   - 支持创建、管理多个四种可命名线程池;
  *   - 添加CountDownLatch任务执行计数，可阻塞等待所有或指定线程池或任务执行、获取结果;
  *   - 实现Executor，可供CompletableFuture使用;
- * 2.线程共享对象 --- {@link #threadSharedMap}
+ * 2.线程共享对象 --- {@link #THREAD_SHARED_MAP}
  *   - 支持添加、管理、获取线程共享对象;
- * 3.ThreadLocal --- {@link #threadLocalMap}
+ * 3.ThreadLocal --- {@link #THREAD_LOCAL_MAP}
  *   - 支持创建、管理ThreadLocal及其值;
  *   - 若需在线程池中使用则依赖TransmittableThreadLocal，同时包装线程池
- * 4.结束标记 --- {@link #endMarkerMap}
+ * 4.结束标记 --- {@link #END_MARKER_MAP}
  *   - 放入、记录、判断结束标记;
  * 5.线程池创建 --- {@link ThreadPool}
  *   - 线程池使用;
@@ -42,7 +48,7 @@ public final class Concurrents {
     /*-------------------------------------------------------------------------*/
 
     // 线程池名::类型 -> 线程池
-    private static final Map<String, ThreadPool> theadPoolMap = new ConcurrentHashMap<>();
+    private static final Map<String, ThreadPool> THREAD_POOL_MAP = new ConcurrentHashMap<>();
 
     /**
      * 获取Fixed线程池
@@ -77,15 +83,15 @@ public final class Concurrents {
      */
     private static ThreadPool getThreadPool(String name, ThreadPoolType type) {
         // 不存在则放入，返回新结果，存在则直接返回该结果
-        return theadPoolMap.computeIfAbsent(getKey(name, type.name()), type::create);
+        return THREAD_POOL_MAP.computeIfAbsent(getKey(name, type.name()), type::create);
     }
 
     /**
      * 关闭所有线程池，并且丢弃记录打印日志
      */
     public static void shutdownWithLog() {
-        theadPoolMap.values().parallelStream().forEach(ThreadPool::shutdownWithLog);
-        theadPoolMap.clear();
+        THREAD_POOL_MAP.values().parallelStream().forEach(ThreadPool::shutdownWithLog);
+        THREAD_POOL_MAP.clear();
     }
 
 
@@ -97,20 +103,21 @@ public final class Concurrents {
     /**
      * name -> 线程共享对象
      */
-    private static final Map<String, Object> threadSharedMap = new ConcurrentHashMap<>();
+    private static final Map<String, Object> THREAD_SHARED_MAP = new ConcurrentHashMap<>();
 
     /**
      * 刷新线程共享对象
      */
-    public static <T> void refreshThreadShared(String name, T t) {
-        threadSharedMap.put(name, t);
+    public static <T> T refreshThreadShared(String name, T t) {
+        THREAD_SHARED_MAP.put(name, t);
+        return t;
     }
 
     /**
      * 获取线程共享对象
      */
     public static <T> T getThreadShared(String name) {
-        return (T) threadSharedMap.get(name);
+        return (T) THREAD_SHARED_MAP.get(name);
     }
 
 
@@ -122,7 +129,7 @@ public final class Concurrents {
     /**
      * threadLocal名 -> ThreadLocal的Map
      */
-    private static final Map<String, ThreadLocal<?>> threadLocalMap = new ConcurrentHashMap<>();
+    private static final Map<String, ThreadLocal<?>> THREAD_LOCAL_MAP = new ConcurrentHashMap<>();
 
     /**
      * 刷新ThreadLocal，没有则创建，接收给定值
@@ -149,7 +156,7 @@ public final class Concurrents {
      * 删除ThreadLocal
      */
     public static void removeThreadLocal(String name) {
-        ThreadLocal<?> threadLocal = threadLocalMap.remove(name);
+        ThreadLocal<?> threadLocal = THREAD_LOCAL_MAP.remove(name);
         if (threadLocal != null) {
             threadLocal.remove();
         }
@@ -159,7 +166,7 @@ public final class Concurrents {
      * 获取ThreadLocal，没有则创建，每次获取调用supplier（若不为null）
      */
     private static <T> ThreadLocal<T> getThreadLocal(String name, Supplier<T> supplier) {
-        return (ThreadLocal<T>) threadLocalMap.computeIfAbsent(
+        return (ThreadLocal<T>) THREAD_LOCAL_MAP.computeIfAbsent(
                 name, key -> supplier == null ?
                         new ThreadLocal<>() : ThreadLocal.withInitial(supplier));
     }
@@ -194,7 +201,7 @@ public final class Concurrents {
     /*-------------------------------------------------------------------------*/
 
     // 队列结束标记map，队列 -> 结束标记
-    private static final Map<Queue<?>, Object> endMarkerMap = new ConcurrentHashMap<>();
+    private static final Map<Queue<?>, Object> END_MARKER_MAP = new ConcurrentHashMap<>();
 
     /**
      * 往队列末尾put一个结束标记
@@ -216,7 +223,7 @@ public final class Concurrents {
     public static <T> void putEnd(BlockingQueue<T> queue, T endMarker, long count) {
         try {
             // 记录结束标记
-            endMarkerMap.put(queue, endMarker);
+            END_MARKER_MAP.put(queue, endMarker);
             // 放入queue
             for (long i = 0; i < count; i++) {
                 queue.put(endMarker);
@@ -232,7 +239,7 @@ public final class Concurrents {
     public static <T> void transferEnd(TransferQueue<T> queue, T endMarker, long count) {
         try {
             // 记录结束标记
-            endMarkerMap.put(queue, endMarker);
+            END_MARKER_MAP.put(queue, endMarker);
             // 放入queue
             for (long i = 0; i < count; i++) {
                 queue.transfer(endMarker);
@@ -246,7 +253,7 @@ public final class Concurrents {
      * 是否是队列的结束标记
      */
     public static <T> boolean isEnd(Queue<T> queue, T obj) {
-        Object endMarker = endMarkerMap.get(queue);
+        Object endMarker = END_MARKER_MAP.get(queue);
         return endMarker != null && endMarker == obj;
     }
 
@@ -254,7 +261,7 @@ public final class Concurrents {
      * 清除队列对应的结束标记
      */
     public static <T> void clearEnd(Queue<T> queue) {
-        endMarkerMap.remove(queue);
+        END_MARKER_MAP.remove(queue);
     }
 
 
@@ -300,7 +307,7 @@ public final class Concurrents {
          */
         public void shutdownAndDiscard() {
             executor.shutdown();
-            theadPoolMap.remove(getKey(name, type));
+            THREAD_POOL_MAP.remove(getKey(name, type));
         }
 
         /**
@@ -323,8 +330,9 @@ public final class Concurrents {
 
         /**
          * 添加一个任务到线程池中执行
-         * 若需指定该任务await，使用{@link ThreadPool#execute(java.lang.Runnable, int)}
+         * 若需指定该任务await，使用{@link ThreadPool#execute(Runnable, int)}
          */
+        @Override
         public void execute(@NonNull Runnable task) {
             latchMap.put(task, new CountDownLatch(1));
             executor.execute(decorate(task));
@@ -705,7 +713,7 @@ public final class Concurrents {
      * 获取当前 线程池名::类型 -> 线程池 的信息
      */
     public static String infoThreadPoolMap() {
-        return theadPoolMap.toString();
+        return THREAD_POOL_MAP.toString();
     }
 
     /**
@@ -713,7 +721,7 @@ public final class Concurrents {
      */
     public static Map<String, String> infoLatchInfoMap() {
         Map<String, String> latchInfoMap = new HashMap<>();
-        theadPoolMap.forEach((k, v) -> latchInfoMap.put(k, v.infoLatchMap()));
+        THREAD_POOL_MAP.forEach((k, v) -> latchInfoMap.put(k, v.infoLatchMap()));
         return latchInfoMap;
     }
 
@@ -721,14 +729,14 @@ public final class Concurrents {
      * 获取当前 线程共享对象 的信息
      */
     public static String infoThreadSharedMap() {
-        return threadSharedMap.toString();
+        return THREAD_SHARED_MAP.toString();
     }
 
     /**
      * 获取当前 ThreadLocal 的信息
      */
     public static String infoThreadLocalMap() {
-        return threadLocalMap.toString();
+        return THREAD_LOCAL_MAP.toString();
     }
 
     /**
@@ -736,7 +744,7 @@ public final class Concurrents {
      */
     public static String infoEndMarkerMap() {
         Map<String, Object> idToEndMarkerMap = new HashMap<>();
-        endMarkerMap.forEach((k, v) -> idToEndMarkerMap.put(getSimpleName(k), v));
+        END_MARKER_MAP.forEach((k, v) -> idToEndMarkerMap.put(getSimpleName(k), v));
         return idToEndMarkerMap.toString();
     }
 
@@ -752,7 +760,7 @@ public final class Concurrents {
     private static String getKey(String prefix, String suffix) {
         return prefix + "::" + suffix;
     }
-    
+
     /**
      * 获取类的简名
      */
