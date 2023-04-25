@@ -18,7 +18,7 @@ import java.util.concurrent.Executor;
 @Slf4j
 @RestController
 public class TraceController {
-    private static final Executor traceExecutor =
+    private static final Executor TRACE_EXECUTOR =
             // 先拷贝到任务线程，执行完后再将值拷贝回去（CopyOnWrite思想）
             TtlExecutors.getTtlExecutor(
                     Concurrents.getFixedThreadPool("trace"));
@@ -26,6 +26,6 @@ public class TraceController {
     @GetMapping("trace")
     public void trace() {
         log.info("main......");
-        traceExecutor.execute(() -> log.info("threadPool......."));
+        TRACE_EXECUTOR.execute(() -> log.info("threadPool......."));
     }
 }

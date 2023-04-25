@@ -15,14 +15,14 @@ public abstract class Timing {
     /**
      * 线程id -> 开始时间 的map
      */
-    private static final Map<Long, Instant> idToStartMap = new HashMap<>();
+    private static final Map<Long, Instant> ID_TO_START_MAP = new HashMap<>();
 
     /**
      * 开始计时
      */
     public static void start() {
         Instant start = Instant.now();
-        idToStartMap.put(Thread.currentThread().getId(), start);
+        ID_TO_START_MAP.put(Thread.currentThread().getId(), start);
     }
 
     /**
@@ -30,7 +30,7 @@ public abstract class Timing {
      */
     public static Duration end() {
         Instant end = Instant.now();
-        Instant start = idToStartMap.remove(Thread.currentThread().getId());
+        Instant start = ID_TO_START_MAP.remove(Thread.currentThread().getId());
         return Duration.between(start, end);
     }
 

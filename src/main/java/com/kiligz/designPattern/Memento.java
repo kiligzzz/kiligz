@@ -16,7 +16,7 @@ public interface Memento<T> extends Serializable {
     /**
      * 备忘录map，对象唯一id::key -> Memento（对象副本）
      */
-    Map<String, Memento<?>> mementoMap = new HashMap<>();
+    Map<String, Memento<?>> MEMENTO_MAP = new HashMap<>();
 
     /**
      * 保存备忘录
@@ -24,7 +24,7 @@ public interface Memento<T> extends Serializable {
     default void saveMemento(String key) throws Exception {
         String mementoKey = System.identityHashCode(this) + "::" + key;
         Memento<T> memento = (Memento<T>) this.deepCopy();
-        mementoMap.put(mementoKey, memento);
+        MEMENTO_MAP.put(mementoKey, memento);
     }
 
     /**
@@ -32,7 +32,7 @@ public interface Memento<T> extends Serializable {
      */
     default T restoreMemento(String key) {
         String mementoKey = System.identityHashCode(this) + "::" + key;
-        return (T) mementoMap.get(mementoKey);
+        return (T) MEMENTO_MAP.get(mementoKey);
     }
 
     /**
@@ -56,7 +56,7 @@ public interface Memento<T> extends Serializable {
      * 备忘录信息
      */
     default String infoMementoMap() {
-        return mementoMap.toString();
+        return MEMENTO_MAP.toString();
     }
 }
 

@@ -20,17 +20,17 @@ public class BeanUtil {
     /**
      * 方法访问器缓存
      */
-    private static final ConcurrentMap<Class<?>, MethodAccess> cache = Maps.newConcurrentMap();
+    private static final ConcurrentMap<Class<?>, MethodAccess> CACHE = Maps.newConcurrentMap();
 
     /**
      * 获取方法访问器
      */
     public static MethodAccess getMethodAccess(Class<?> clazz) {
-        if(cache.containsKey(clazz)) {
-            return cache.get(clazz);
+        if(CACHE.containsKey(clazz)) {
+            return CACHE.get(clazz);
         }
         MethodAccess methodAccess = MethodAccess.get(clazz);
-        cache.putIfAbsent(clazz, methodAccess);
+        CACHE.putIfAbsent(clazz, methodAccess);
         return methodAccess;
     }
 

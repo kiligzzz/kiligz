@@ -1,4 +1,4 @@
-package com.kiligz.kzp.common.utils;
+package com.kiligz.concurrent;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
