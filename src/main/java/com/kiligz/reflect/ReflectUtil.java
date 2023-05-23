@@ -1,4 +1,4 @@
-package com.kiligz.kzp.common.utils;
+package com.kiligz.reflect;
 
 import com.esotericsoftware.reflectasm.FieldAccess;
 import com.esotericsoftware.reflectasm.MethodAccess;
@@ -9,6 +9,7 @@ import java.util.function.Function;
 
 /**
  * 反射工具类，高速缓存ASM
+ * 只能在权限内访问方法或属性
  *
  * @author Ivan
  * @since 2022/11/28
@@ -43,11 +44,6 @@ public class ReflectUtil {
      */
     private static <T> T getAccess(ConcurrentMap<Class<?>, T> accessMap, Class<?> clazz,
                                    Function<Class<?>, T> accessFunction) {
-        if (accessMap.containsKey(clazz)) {
-            return accessMap.get(clazz);
-        }
-        T access = accessFunction.apply(clazz);
-        accessMap.putIfAbsent(clazz, access);
-        return access;
+        return accessMap.computeIfAbsent(clazz, accessFunction);
     }
 }

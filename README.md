@@ -2,11 +2,11 @@
 
 ## 简介
 
-包含一些自己写的工具类、以及一些特殊实现等
+包含一些自己写的工具类、常用算法、常用设计模式模板、以及一些特殊实现等
 
 ## 工具类
 
-> 包含并发管理器、唯一标识、计时器、git等
+> 包含并发管理器、Nacos配置工具类、Class助手类、唯一标识、计时器、git等
 
 ### [Concurrents](src/main/java/com/kiligz/concurrent/Concurrents.java)
 
@@ -33,7 +33,7 @@
 
 
 
-### [NacosUtil](src/main/java/com/kiligz/nacos/NacosUtil.java)
+###  [NacosConfigUtil](src/main/java/com/kiligz/nacos/NacosConfigUtil.java) 
 
 > 用于实时获取nacos上的配置，并转换为相应格式
 
@@ -43,9 +43,52 @@
 
 
 
+###  [ClassHelper](src/main/java/com/kiligz/classHelper/ClassHelper.java) 
+
+> Class助手类，主要是对于Class类型的操作
+
+1. 支持依据不同类加载器创建实例，实例可缓存，默认使用线程上下文类加载器
+2. 支持获取类、接口的 整个模块中 或 指定包 中的子类、实现类的Class
+3. 支持获取 整个模块中 或 指定包 中的所有类的Class
+4. 支持获取 整个模块中 或 指定包 中的所有类的全限定名
+5. 支持根据类的全限定名获取类的Class
+    (Tips:2、3、4、5都支持获取项目依赖的jar中的内容，并且都支持缓存Class)
+6. 支持获取一个类的所有内部类的Class
+
+
+
+## 设计模式模板
+
+### [Prototype](src/main/java/com/kiligz/designPattern/Prototype.java)   
+
+> 原型模式接口，提供默认的浅拷贝、深拷贝（序列化方式）方法
+
+### [Memento](src/main/java/com/kiligz/designPattern/Memento.java) 
+
+> 备忘录模式接口，搭配深拷贝（原型模式）
+
+1. 提供保存、恢复备忘录、深拷贝方法
+2. 每个对象根据key操作自己的备忘录，可有相同的key
+
+### [Transformer](src/main/java/com/kiligz/designPattern/Transformer.java) 
+
+> 责任链模式，转换器抽象类
+
+1. 支持通过方法构造和拼接链式Transformer
+
+
+
+## 算法模板
+
+###  [Dijkstra](src/main/java/com/kiligz/algorithm/Dijkstra.java)
+
+> 求最短路径
+
+
+
 ## 特殊实现
 
-> 包含 内存安全的blockingQueue、一些设计模式（原型、备忘录、责任链）的实现应用、lucene的一些特殊场景、高速缓存ASM的应用、单词查找树应用等
+> 包含 内存安全的blockingQueue、lucene的一些特殊场景、高速缓存ASM的应用、单词查找树应用等
 
 ### [分布式异步日志全链路追踪](src/main/java/com/kiligz/trace)
 
