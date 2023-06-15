@@ -9,9 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -26,8 +26,9 @@ import java.util.function.Supplier;
  * 3.ThreadLocal --- {@link #THREAD_LOCAL_MAP}
  *   - 支持创建、管理ThreadLocal及其值;
  *   - 若需在线程池中使用则依赖TransmittableThreadLocal，同时包装线程池
- * 4.结束标记 --- {@link #END_MARKER_MAP}
- *   - 放入、记录、判断结束标记;
+ * 4.数据任务封装 --- {@link #createDataTask}
+ *   - 支持获取封装数据 & 对数据的操作 & 本次数据消费状态
+ *   - 支持获取数据任务结束标记
  * 5.线程池创建 --- {@link ThreadPool}
  *   - 线程池使用;
  *   - CountDownLatch;
@@ -41,7 +42,7 @@ import java.util.function.Supplier;
  * @author Ivan
  */
 @Slf4j
-@SuppressWarnings("unchecked")
+@SuppressWarnings("all")
 public final class Concurrents {
     /*-------------------------------------------------------------------------*/
     /*--------------------------------- 线程池 ---------------------------------*/
@@ -194,76 +195,38 @@ public final class Concurrents {
 //                        new TransmittableThreadLocal<>() : TransmittableThreadLocal.withInitial(supplier));
 //    }
 
-
-
     /*-------------------------------------------------------------------------*/
-    /*-------------------------------- 结束标记 --------------------------------*/
+    /*------------------------------ 数据任务封装 -------------------------------*/
     /*-------------------------------------------------------------------------*/
 
-    // 队列结束标记map，队列 -> 结束标记
-    private static final Map<Queue<?>, Object> END_MARKER_MAP = new ConcurrentHashMap<>();
-
     /**
-     * 往队列末尾put一个结束标记
+     * 创建数据任务封装
      */
-    public static <T> void putEnd(BlockingQueue<T> queue, T endMarker) {
-        putEnd(queue, endMarker, 1);
+    public static <T> DataTask createDataTask(T data, Consumer<T> consumer) {
+        return new DataTask(data, (Consumer<Object>) consumer, false);
     }
 
     /**
-     * 往队列末尾transfer一个结束标记
+     * 数据任务封装的结束标记
      */
-    public static <T> void transferEnd(TransferQueue<T> queue, T endMarker) {
-        transferEnd(queue, endMarker, 1);
+    public static DataTask endDataTask() {
+        return new DataTask(null, null, true);
     }
 
     /**
-     * 往队列末尾put指定个结束标记
+     * 数据任务封装
      */
-    public static <T> void putEnd(BlockingQueue<T> queue, T endMarker, long count) {
-        try {
-            // 记录结束标记
-            END_MARKER_MAP.put(queue, endMarker);
-            // 放入queue
-            for (long i = 0; i < count; i++) {
-                queue.put(endMarker);
-            }
-        } catch (InterruptedException e) {
-            log.error("Interrupted exception while await put {} to {}.", endMarker, queue, e);
+    @AllArgsConstructor
+    public static class DataTask {
+        private final Object data;
+        private final Consumer<Object> consumer;
+        @Getter
+        private final boolean isEnd;
+
+        public void exec() {
+            consumer.accept(data);
         }
     }
-
-    /**
-     * 往队列末尾transfer指定个结束标记
-     */
-    public static <T> void transferEnd(TransferQueue<T> queue, T endMarker, long count) {
-        try {
-            // 记录结束标记
-            END_MARKER_MAP.put(queue, endMarker);
-            // 放入queue
-            for (long i = 0; i < count; i++) {
-                queue.transfer(endMarker);
-            }
-        } catch (InterruptedException e) {
-            log.error("Interrupted exception while transfer {} to {}.", endMarker, queue, e);
-        }
-    }
-
-    /**
-     * 是否是队列的结束标记
-     */
-    public static <T> boolean isEnd(Queue<T> queue, T obj) {
-        Object endMarker = END_MARKER_MAP.get(queue);
-        return endMarker != null && endMarker == obj;
-    }
-
-    /**
-     * 清除队列对应的结束标记
-     */
-    public static <T> void clearEnd(Queue<T> queue) {
-        END_MARKER_MAP.remove(queue);
-    }
-
 
 
     /*-------------------------------------------------------------------------*/
@@ -737,15 +700,6 @@ public final class Concurrents {
      */
     public static String infoThreadLocalMap() {
         return THREAD_LOCAL_MAP.toString();
-    }
-
-    /**
-     * 获取当前 结束标记 的信息
-     */
-    public static String infoEndMarkerMap() {
-        Map<String, Object> idToEndMarkerMap = new HashMap<>();
-        END_MARKER_MAP.forEach((k, v) -> idToEndMarkerMap.put(getSimpleName(k), v));
-        return idToEndMarkerMap.toString();
     }
 
 
