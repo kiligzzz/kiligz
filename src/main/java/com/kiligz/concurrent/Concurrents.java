@@ -29,12 +29,16 @@ import java.util.function.Supplier;
  * 4.数据任务封装 --- {@link #createDataTask}
  *   - 支持获取封装数据 & 对数据的操作 & 本次数据消费状态
  *   - 支持获取数据任务结束标记
- * 5.线程池创建 --- {@link ThreadPool}
+ * 5.观察者模式生产消费数据 --- {@link #observer}
+ *   - 支持简便的观察者模式生产和消费数据
+ *   - 支持数据生产消费完毕后自动停止任务
+ *   - 支持指定生产者消费者线程数
+ * 6.线程池创建 --- {@link ThreadPool}
  *   - 线程池使用;
  *   - CountDownLatch;
  *   - Support;
- * 6.当前map信息获取 --- {@link #infoThreadPoolMap}
- * 7.工具方法 --- {@link #getKey}
+ * 7.当前map信息获取 --- {@link #infoThreadPoolMap}
+ * 8.工具方法 --- {@link #getKey}
  *   - 支持获取一个在当前线程执行任务的Executor对象
  * （所有异常均未抛出只打印了日志，需抛出则改写）
  * </pre>
@@ -110,7 +114,7 @@ public final class Concurrents {
      * 刷新线程共享对象
      */
     public static <T> T refreshThreadShared(String name, T t) {
-        THREAD_SHARED_MAP.put(name, t);
+        THREAD_SHARED_MAP.compute(name, (k, v) -> t);
         return t;
     }
 
@@ -226,6 +230,61 @@ public final class Concurrents {
         public void exec() {
             consumer.accept(data);
         }
+
+        @Override
+        public String toString() {
+            return data.toString();
+        }
+    }
+
+
+
+    /*-------------------------------------------------------------------------*/
+    /*-------------------------- 观察者模式生产消费数据 ---------------------------*/
+    /*-------------------------------------------------------------------------*/
+
+    /**
+     * 观察者模式生产消费数据
+     */
+    public static <T> void observer(String name, Provider provider) {
+        observer(name, provider, 1, 1);
+    }
+
+    /**
+     * 多线程观察者模式生产消费数据
+     */
+    public static void observer(String name, Provider provider,
+                                int providerCount, int consumerCount) {
+        LinkedTransferQueue<DataTask> queue = new LinkedTransferQueue<>();
+        refreshThreadShared(name, queue);
+        ThreadPool ptp = getFixedThreadPool(name + "-provider");
+        ThreadPool ctp = getFixedThreadPool(name + "-consumer");
+
+        ptp.execute(() -> provider.accept(queue), providerCount);
+        ctp.execute(() -> {
+            while (true) {
+                try {
+                    DataTask dataTask = queue.take();
+                    if (dataTask.isEnd()) return;
+                    dataTask.exec();
+                } catch (Exception e) {
+                    log.error("Consume data error. ", e);
+                }
+            }
+        }, consumerCount);
+
+        ptp.shutdownWithLog();
+        for (int i = 0; i < consumerCount; i++) {
+            queue.put(endDataTask());
+        }
+        ctp.shutdownWithLog();
+        refreshThreadShared(name, null);
+    }
+
+    /**
+     * 观察者模式生产者接口
+     */
+    public static interface Provider extends Consumer<TransferQueue<DataTask>> {
     }
 
 
