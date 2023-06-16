@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
  * Class助手类
  * <pre>
  * 1.支持依据不同类加载器创建实例，实例可缓存，默认使用线程上下文类加载器 --- {@link #getInstance()}
- * 2.支持获取类、接口的 整个模块中 或 指定包 中的子类、实现类的Class --- {@link #getSubAndImplClasses(Class, String...)}
+ * 2.支持获取类、接口的 整个模块中 或 指定包 中的(直接)子类、实现类的Class --- {@link #getSubAndImplClasses(Class, String...)}
  * 3.支持获取 整个模块中 或 指定包 中的所有类的Class --- {@link #loadClasses(String...)}
  * 4.支持获取 整个模块中 或 指定包 中的所有类的全限定名 --- {@link #getClassNames(String...)}
  * 5.支持根据类的全限定名获取类的Class --- {@link #loadClass(String)}
@@ -30,7 +30,7 @@ public class ClassHelper {
     private static final String CLASS_SUFFIX = ".class";
     private static final String JAR_ROOT_START = "/BOOT-INF/classes/";
     private static final String FILE_ROOT_START = "/classes/";
-    
+
     /**
      * 类加载器 -> 该类实例
      */
@@ -111,6 +111,36 @@ public class ClassHelper {
             }
         }
         return implClassList;
+    }
+
+    /**
+     * 获取一个类的直接子类以及实现类，可指定包
+     */
+    public List<Class<?>> getDirectSubAndImplClasses(Class<?> origin, String... packageNames) {
+        List<Class<?>> classList = getDirectSubClasses(origin, packageNames);
+        classList.addAll(getDirectImplClasses(origin, packageNames));
+        return classList;
+    }
+
+    /**
+     * 获取一个类的直接子类，可指定包
+     */
+    public List<Class<?>> getDirectSubClasses(Class<?> origin, String... packageNames) {
+        return getSubClasses(origin, packageNames)
+                .stream()
+                .filter(sub -> sub.getSuperclass() == origin
+                        || Arrays.asList(sub.getInterfaces()).contains(origin))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取一个接口的直接实现类，可指定包
+     */
+    public List<Class<?>> getDirectImplClasses(Class<?> origin, String... packageNames) {
+        return getImplClasses(origin, packageNames)
+                .stream()
+                .filter(impl -> Arrays.asList(impl.getInterfaces()).contains(origin))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -198,8 +228,9 @@ public class ClassHelper {
                     .map(path -> pathToClassName(path, JAR_ROOT_START))
                     .collect(Collectors.toList());
         } catch (Exception e) {
-            throw new RuntimeException("Error while getting class name from jar", e);
+            e.printStackTrace();
         }
+        return new ArrayList<>();
     }
 
     /**
