@@ -3,6 +3,7 @@ package com.kiligz.classHelper;
 import com.kiligz.io.FileUtil;
 
 import java.io.File;
+import java.lang.reflect.Modifier;
 import java.net.JarURLConnection;
 import java.net.URL;
 import java.util.*;
@@ -15,7 +16,7 @@ import java.util.stream.Collectors;
  * Class助手类
  * <pre>
  * 1.支持依据不同类加载器创建实例，实例可缓存，默认使用线程上下文类加载器 --- {@link #getInstance()}
- * 2.支持获取类、接口的 整个模块中 或 指定包 中的(直接)子类、实现类的Class --- {@link #getSubAndImplClasses(Class, String...)}
+ * 2.支持获取类、接口的 整个模块中 或 指定包 中的(直接|非抽象)子类、实现类的Class --- {@link #getSubAndImplClasses(Class, String...)}
  * 3.支持获取 整个模块中 或 指定包 中的所有类的Class --- {@link #loadClasses(String...)}
  * 4.支持获取 整个模块中 或 指定包 中的所有类的全限定名 --- {@link #getClassNames(String...)}
  * 5.支持根据类的全限定名获取类的Class --- {@link #loadClass(String)}
@@ -111,6 +112,16 @@ public class ClassHelper {
             }
         }
         return implClassList;
+    }
+
+    /**
+     * 获取一个接口的所有非抽象的实现类，可指定包
+     */
+    public List<Class<?>> getNonAbstractImplClasses(Class<?> origin, String... packageNames) {
+        return getImplClasses(origin, packageNames)
+                .stream()
+                .filter(clazz -> !Modifier.isAbstract(clazz.getModifiers()))
+                .collect(Collectors.toList());
     }
 
     /**
