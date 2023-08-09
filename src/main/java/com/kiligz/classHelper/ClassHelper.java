@@ -83,8 +83,7 @@ public class ClassHelper {
     public List<Class<?>> getSubClasses(Class<?> origin, String... packageNames) {
         return filterList(
                 loadClasses(packageNames),
-                clazz -> origin != clazz && origin.isAssignableFrom(clazz)
-                        && origin.isInterface() == clazz.isInterface());
+                clazz -> isSubClass(clazz, origin));
     }
 
     /**
@@ -97,7 +96,7 @@ public class ClassHelper {
         }
         return filterList(
                 loadClasses(packageNames),
-                clazz -> origin != clazz && origin.isAssignableFrom(clazz) && !clazz.isInterface());
+                clazz -> isImplClass(clazz, origin));
     }
 
     /**
@@ -106,7 +105,7 @@ public class ClassHelper {
     public List<Class<?>> getNonAbstractImplClasses(Class<?> origin, String... packageNames) {
         return filterList(
                 getImplClasses(origin, packageNames),
-                clazz -> !Modifier.isAbstract(clazz.getModifiers()));
+                this::isNotAbstractClass);
     }
 
     /**
@@ -124,8 +123,7 @@ public class ClassHelper {
     public List<Class<?>> getDirectSubClasses(Class<?> origin, String... packageNames) {
         return filterList(
                 getSubClasses(origin, packageNames),
-                sub -> sub.getSuperclass() == origin
-                        || Arrays.asList(sub.getInterfaces()).contains(origin));
+                sub -> isDirectSubClass(sub, origin));
     }
 
     /**
@@ -134,7 +132,7 @@ public class ClassHelper {
     public List<Class<?>> getDirectImplClasses(Class<?> origin, String... packageNames) {
         return filterList(
                 getImplClasses(origin, packageNames),
-                impl -> Arrays.asList(impl.getInterfaces()).contains(origin));
+                impl -> isDirectImplClass(impl, origin));
     }
 
     /**
@@ -221,6 +219,44 @@ public class ClassHelper {
         mergeList.addAll(list1);
         mergeList.addAll(list2);
         return mergeList;
+    }
+
+    /**
+     * 是对应的子类
+     */
+    private boolean isSubClass(Class<?> clazz, Class<?> origin) {
+        return origin != clazz
+                && origin.isAssignableFrom(clazz)
+                && origin.isInterface() == clazz.isInterface();
+    }
+
+    /**
+     * 是对应的实现类
+     */
+    private boolean isImplClass(Class<?> clazz, Class<?> origin) {
+        return origin != clazz && origin.isAssignableFrom(clazz) && !clazz.isInterface();
+    }
+
+    /**
+     * 是抽象类
+     */
+    private boolean isNotAbstractClass(Class<?> clazz) {
+        return !Modifier.isAbstract(clazz.getModifiers());
+    }
+
+    /**
+     * 是直接子类
+     */
+    private boolean isDirectSubClass(Class<?> sub, Class<?> origin) {
+        return sub.getSuperclass() == origin
+                || Arrays.asList(sub.getInterfaces()).contains(origin);
+    }
+
+    /**
+     * 是直接实现类
+     */
+    private boolean isDirectImplClass(Class<?> impl, Class<?> origin) {
+        return Arrays.asList(impl.getInterfaces()).contains(origin);
     }
 
     /**
