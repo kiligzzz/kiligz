@@ -8,6 +8,7 @@ import java.net.JarURLConnection;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
@@ -71,87 +72,69 @@ public class ClassHelper {
      * 获取一个类的所有子类以及实现类，可指定包
      */
     public List<Class<?>> getSubAndImplClasses(Class<?> origin, String... packageNames) {
-        List<Class<?>> classList = getSubClasses(origin, packageNames);
-        classList.addAll(getImplClasses(origin, packageNames));
-        return classList;
+        return mergeList(
+                getSubClasses(origin, packageNames),
+                getImplClasses(origin, packageNames));
     }
 
     /**
      * 获取一个类的所有子类，可指定包
      */
     public List<Class<?>> getSubClasses(Class<?> origin, String... packageNames) {
-        List<Class<?>> subClassList = new ArrayList<>();
-
-        List<Class<?>> classList = loadClasses(packageNames);
-        for (Class<?> clazz : classList) {
-            if (origin != clazz
-                    && origin.isAssignableFrom(clazz)
-                    && origin.isInterface() == clazz.isInterface()) {
-                subClassList.add(clazz);
-            }
-        }
-        return subClassList;
+        return filterList(
+                loadClasses(packageNames),
+                clazz -> origin != clazz && origin.isAssignableFrom(clazz)
+                        && origin.isInterface() == clazz.isInterface());
     }
 
     /**
      * 获取一个接口的所有实现类，可指定包
      */
     public List<Class<?>> getImplClasses(Class<?> origin, String... packageNames) {
-        List<Class<?>> implClassList = new ArrayList<>();
         // 不是接口则直接返回
         if (!origin.isInterface()) {
-            return implClassList;
+            return new ArrayList<>();
         }
-
-        List<Class<?>> classList = loadClasses(packageNames);
-        for (Class<?> clazz : classList) {
-            if (origin != clazz
-                    && origin.isAssignableFrom(clazz)
-                    && !clazz.isInterface()) {
-                implClassList.add(clazz);
-            }
-        }
-        return implClassList;
+        return filterList(
+                loadClasses(packageNames),
+                clazz -> origin != clazz && origin.isAssignableFrom(clazz) && !clazz.isInterface());
     }
 
     /**
      * 获取一个接口的所有非抽象的实现类，可指定包
      */
     public List<Class<?>> getNonAbstractImplClasses(Class<?> origin, String... packageNames) {
-        return getImplClasses(origin, packageNames)
-                .stream()
-                .filter(clazz -> !Modifier.isAbstract(clazz.getModifiers()))
-                .collect(Collectors.toList());
+        return filterList(
+                getImplClasses(origin, packageNames),
+                clazz -> !Modifier.isAbstract(clazz.getModifiers()));
     }
 
     /**
      * 获取一个类的直接子类以及实现类，可指定包
      */
     public List<Class<?>> getDirectSubAndImplClasses(Class<?> origin, String... packageNames) {
-        List<Class<?>> classList = getDirectSubClasses(origin, packageNames);
-        classList.addAll(getDirectImplClasses(origin, packageNames));
-        return classList;
+        return mergeList(
+                getDirectSubClasses(origin, packageNames),
+                getDirectImplClasses(origin, packageNames));
     }
 
     /**
      * 获取一个类的直接子类，可指定包
      */
     public List<Class<?>> getDirectSubClasses(Class<?> origin, String... packageNames) {
-        return getSubClasses(origin, packageNames)
-                .stream()
-                .filter(sub -> sub.getSuperclass() == origin
-                        || Arrays.asList(sub.getInterfaces()).contains(origin))
-                .collect(Collectors.toList());
+        return filterList(
+                getSubClasses(origin, packageNames),
+                sub -> sub.getSuperclass() == origin
+                        || Arrays.asList(sub.getInterfaces()).contains(origin));
     }
 
     /**
      * 获取一个接口的直接实现类，可指定包
      */
     public List<Class<?>> getDirectImplClasses(Class<?> origin, String... packageNames) {
-        return getImplClasses(origin, packageNames)
-                .stream()
-                .filter(impl -> Arrays.asList(impl.getInterfaces()).contains(origin))
-                .collect(Collectors.toList());
+        return filterList(
+                getImplClasses(origin, packageNames),
+                impl -> Arrays.asList(impl.getInterfaces()).contains(origin));
     }
 
     /**
@@ -219,6 +202,25 @@ public class ClassHelper {
             classList.addAll(getInnerClasses(innerClass));
         }
         return classList;
+    }
+
+
+
+    /**
+     * 过滤结果
+     */
+    private List<Class<?>> filterList(List<Class<?>> classList, Predicate<Class<?>> predicate) {
+        return classList.stream().filter(predicate).collect(Collectors.toList());
+    }
+
+    /**
+     * 合并结果
+     */
+    private List<Class<?>> mergeList(List<Class<?>> list1, List<Class<?>> list2) {
+        List<Class<?>> mergeList = new ArrayList<>();
+        mergeList.addAll(list1);
+        mergeList.addAll(list2);
+        return mergeList;
     }
 
     /**
