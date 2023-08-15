@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * 4.支持获取 整个模块中 或 指定包 中的所有类的全限定名 --- {@link #getClassNames(String...)}
  * 5.支持根据类的全限定名获取类的Class --- {@link #loadClass(String)}
  *  (Tips:2、3、4、5都支持获取项目依赖的jar中的内容，并且都支持缓存Class)
- * 6.支持获取一个类的所有内部类的Class --- {@link #getInnerClasses(Class)}
+ * 6.支持获取 整个模块中 或 指定包 或 一个类 的所有内部类的Class --- {@link #getInnerClasses(String...)}
  * </pre>
  *
  * @author Ivan
@@ -190,15 +190,30 @@ public class ClassHelper {
     }
 
     /**
+     * 获取指定包的所有内部类
+     */
+    public List<Class<?>> getInnerClasses(String... packageNames) {
+        List<Class<?>> innerClassList = new ArrayList<>();
+
+        List<Class<?>> classList = loadClasses(packageNames);
+        for (Class<?> clazz : classList) {
+            innerClassList.addAll(getInnerClasses(clazz));
+        }
+        return innerClassList;
+    }
+
+    /**
      * 获取一个类的所有内部类
      */
     public List<Class<?>> getInnerClasses(Class<?> clazz) {
         List<Class<?>> classList = new ArrayList<>();
         Collections.addAll(classList, clazz.getDeclaredClasses());
 
-        for (Class<?> innerClass : classList) {
-            classList.addAll(getInnerClasses(innerClass));
-        }
+        List<Class<?>> innerClassList = classList.stream()
+                .map(this::getInnerClasses)
+                .flatMap(Collection::stream)
+                .collect(Collectors.toList());
+        classList.addAll(innerClassList);
         return classList;
     }
 
