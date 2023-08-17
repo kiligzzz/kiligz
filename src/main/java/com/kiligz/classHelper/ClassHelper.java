@@ -199,7 +199,7 @@ public class ClassHelper {
         for (Class<?> clazz : classList) {
             innerClassList.addAll(getInnerClasses(clazz));
         }
-        return innerClassList;
+        return innerClassList.stream().distinct().collect(Collectors.toList());
     }
 
     /**
