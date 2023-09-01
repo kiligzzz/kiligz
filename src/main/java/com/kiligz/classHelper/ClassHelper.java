@@ -140,10 +140,6 @@ public class ClassHelper {
      */
     public List<Class<?>> loadClasses(String... packageNames) {
         List<Class<?>> classList = new ArrayList<>();
-        // 不传包名时，默认加载项目下所有类
-        if (packageNames.length == 0) {
-            packageNames = new String[]{""};
-        }
 
         // 加载指定包下所有类
         List<String> classNames = getClassNames(packageNames);
@@ -160,6 +156,11 @@ public class ClassHelper {
      * 加载项目中或对应包内的所有类，不传值则为项目根路径下
      */
     public List<String> getClassNames(String... packageNames) {
+        // 不传包名时，默认为项目根路径
+        if (packageNames.length == 0) {
+            packageNames = new String[]{""};
+        }
+
         Set<String> classNames = new LinkedHashSet<>();
         for (String packageName : packageNames) {
             URL packageURL = classLoader.getResource(packageNameToPath(packageName));
