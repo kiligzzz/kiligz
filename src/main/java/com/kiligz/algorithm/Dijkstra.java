@@ -163,7 +163,7 @@ public class Dijkstra<E extends Dijkstra.Edge> {
     /**
      * 边接口
      */
-    interface Edge {
+    public interface Edge {
         int getStart();
         int getEnd();
         default int getWeight() {
