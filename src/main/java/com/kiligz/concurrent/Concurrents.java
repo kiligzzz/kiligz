@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.List;
@@ -40,12 +39,10 @@ import java.util.function.Supplier;
  * 7.当前map信息获取 --- {@link #infoThreadPoolMap}
  * 8.工具方法 --- {@link #getKey}
  *   - 支持获取一个在当前线程执行任务的Executor对象
- * （所有异常均未抛出只打印了日志，需抛出则改写）
  * </pre>
  *
  * @author Ivan
  */
-@Slf4j
 @SuppressWarnings("all")
 public final class Concurrents {
     /*-------------------------------------------------------------------------*/
@@ -95,7 +92,7 @@ public final class Concurrents {
      * 关闭所有线程池，并且丢弃记录打印日志
      */
     public static void shutdownWithLog() {
-        THREAD_POOL_MAP.values().parallelStream().forEach(ThreadPool::shutdownWithLog);
+        THREAD_POOL_MAP.values().parallelStream().forEach(ThreadPool::shutdown);
         THREAD_POOL_MAP.clear();
     }
 
@@ -268,16 +265,16 @@ public final class Concurrents {
                     if (dataTask.isEnd()) return;
                     dataTask.exec();
                 } catch (Exception e) {
-                    log.error("Consume data error. ", e);
+                    throw new RuntimeException("Consume data error. ", e);
                 }
             }
         }, consumerCount);
 
-        ptp.shutdownWithLog();
+        ptp.shutdown();
         for (int i = 0; i < consumerCount; i++) {
             queue.put(endDataTask());
         }
-        ctp.shutdownWithLog();
+        ctp.shutdown();
         refreshThreadShared(name, null);
     }
 
@@ -325,22 +322,20 @@ public final class Concurrents {
         }
 
         /**
-         * 关闭线程池，并且丢弃记录
+         * 关闭线程池并丢弃记录
          */
-        public void shutdownAndDiscard() {
+        public void shutdown() {
+            await();
             executor.shutdown();
             THREAD_POOL_MAP.remove(getKey(name, type));
         }
 
         /**
-         * 打印日志并关闭线程池
+         * 关闭线程池并丢弃记录、带出信息
          */
-        public void shutdownWithLog() {
-            await();
-            log.info("[ {} finish. ]", name);
-            log.info("[ {} finish. ]", name);
-            log.info("[ {} finish. ]", name);
-            shutdownAndDiscard();
+        public String shutdownWithInfo() {
+            shutdown();
+            return String.format("[ %s finish ]", name);
         }
 
         /**
@@ -391,9 +386,8 @@ public final class Concurrents {
             try {
                 return executor.invokeAll(taskList);
             } catch (InterruptedException e) {
-                log.error("Interrupted exception while invoke all task.", e);
+                throw new RuntimeException("Interrupted exception while invoke all task", e);
             }
-            return null;
         }
 
         /**
@@ -403,9 +397,8 @@ public final class Concurrents {
             try {
                 return executor.invokeAny(taskList);
             } catch (InterruptedException | ExecutionException e) {
-                log.error("Interrupted or execution exception while invoke any task.", e);
+                throw new RuntimeException("Interrupted or execution exception while invoke any task", e);
             }
-            return null;
         }
 
         /**
@@ -418,7 +411,7 @@ public final class Concurrents {
                 ((ScheduledThreadPoolExecutor) executor).schedule(
                         decorate(task), delay, unit);
             } catch (ClassCastException e) {
-                log.error("This threadPool is not a scheduledThreadPool, please checked it.", e);
+                throw new RuntimeException("This threadPool is not a scheduledThreadPool, please checked it", e);
             }
             return task;
         }
@@ -436,7 +429,7 @@ public final class Concurrents {
                     scheduledThreadPool.schedule(decorator, delay, unit);
                 }
             } catch (ClassCastException e) {
-                log.error("This threadPool is not a scheduledThreadPool, please checked it.", e);
+                throw new RuntimeException("This threadPool is not a scheduledThreadPool, please checked it", e);
             }
             return task;
         }
@@ -451,7 +444,7 @@ public final class Concurrents {
                 ((ScheduledThreadPoolExecutor) executor).scheduleAtFixedRate(
                         decorate(task), delay, period, unit);
             } catch (ClassCastException e) {
-                log.error("This threadPool is not a scheduledThreadPool, please checked it.", e);
+                throw new RuntimeException("This threadPool is not a scheduledThreadPool, please checked it", e);
             }
             return task;
         }
@@ -469,7 +462,7 @@ public final class Concurrents {
                     scheduledThreadPool.scheduleAtFixedRate(decorator, delay, period, unit);
                 }
             } catch (ClassCastException e) {
-                log.error("This threadPool is not a scheduledThreadPool, please checked it.", e);
+                throw new RuntimeException("This threadPool is not a scheduledThreadPool, please checked it", e);
             }
             return task;
         }
@@ -552,7 +545,7 @@ public final class Concurrents {
                 for (CountDownLatch latch : latchMap.values())
                     latch.await();
             } catch (InterruptedException e) {
-                log.error("Interrupted exception while await all task.", e);
+                throw new RuntimeException("Interrupted exception while await all task", e);
             }
         }
 
@@ -565,7 +558,7 @@ public final class Concurrents {
                     if (!latch.await(timeout, timeUnit))
                         return false;
             } catch (InterruptedException e) {
-                log.error("Interrupted exception while timeout await all task.", e);
+                throw new RuntimeException("Interrupted exception while timeout await all task", e);
             }
             return true;
         }
@@ -579,7 +572,7 @@ public final class Concurrents {
                 if (latch != null)
                     latch.await();
             } catch (InterruptedException e) {
-                log.error("Interrupted exception while await {}.", task, e);
+                throw new RuntimeException("Interrupted exception while await " + task, e);
             }
         }
 
@@ -591,9 +584,8 @@ public final class Concurrents {
                 CountDownLatch latch = latchMap.get(task);
                 return latch == null || latch.await(timeout, unit);
             } catch (InterruptedException e) {
-                log.error("Interrupted exception while timeout await {}.", task, e);
+                throw new RuntimeException("Interrupted exception while timeout await " + task, e);
             }
-            return false;
         }
 
         /**
@@ -795,7 +787,7 @@ public final class Concurrents {
         try {
             Thread.sleep(milli);
         } catch (InterruptedException e) {
-            log.error("Interrupted exception while sleep.", e);
+            throw new RuntimeException("Interrupted exception while sleep", e);
         }
     }
 }
