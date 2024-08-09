@@ -89,9 +89,9 @@ public final class Concurrents {
     }
 
     /**
-     * 关闭所有线程池，并且丢弃记录打印日志
+     * 关闭所有线程池，并且丢弃记录
      */
-    public static void shutdownWithLog() {
+    public static void shutdown() {
         THREAD_POOL_MAP.values().parallelStream().forEach(ThreadPool::shutdown);
         THREAD_POOL_MAP.clear();
     }
@@ -109,6 +109,7 @@ public final class Concurrents {
 
     /**
      * 刷新线程共享对象
+     * （t为null时，则删除该key-value，所以要用compute）
      */
     public static <T> T refreshThreadShared(String name, T t) {
         THREAD_SHARED_MAP.compute(name, (k, v) -> t);

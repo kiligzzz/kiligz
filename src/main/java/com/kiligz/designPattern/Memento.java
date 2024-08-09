@@ -21,7 +21,7 @@ public interface Memento<T> extends Serializable {
     /**
      * 保存备忘录
      */
-    default void saveMemento(String key) throws Exception {
+    default void saveMemento(String key) {
         String mementoKey = System.identityHashCode(this) + "::" + key;
         Memento<T> memento = (Memento<T>) this.deepCopy();
         MEMENTO_MAP.put(mementoKey, memento);
@@ -38,7 +38,7 @@ public interface Memento<T> extends Serializable {
     /**
      * 深拷贝
      */
-    default T deepCopy() throws Exception {
+    default T deepCopy() {
         try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
              ObjectOutput oo = new ObjectOutputStream(bos)
         ) {
@@ -49,6 +49,8 @@ public interface Memento<T> extends Serializable {
             ) {
                 return (T) oi.readObject();
             }
+        } catch (Exception e) {
+            throw new RuntimeException("deep copy error", e);
         }
     }
 

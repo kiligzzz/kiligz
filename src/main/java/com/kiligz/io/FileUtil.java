@@ -45,7 +45,7 @@ public class FileUtil {
             File[] files = dir.listFiles();
             if (dir.isDirectory() && files != null) {
                 for (File file : files) {
-                    if (delete(file.getAbsolutePath())) {
+                    if (!delete(file.getAbsolutePath())) {
                         return false;
                     }
                 }

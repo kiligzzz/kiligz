@@ -25,12 +25,12 @@ public class UUID {
     public static String uuid(int length) {
         long timestamp = System.currentTimeMillis();
         int random = (int) (Math.random() * 100000);
-        String traceId = Long.toString(timestamp, 16) + Integer.toString(random, 16);
-        if (traceId.length() > length) {
-            traceId = traceId.substring(0, length);
+        String uuid = Long.toString(timestamp * random, 16) + Integer.toString(random, 16);
+        if (uuid.length() > length) {
+            uuid = uuid.substring(0, length);
         } else {
-            traceId = String.format("%0" + length + "d", Long.parseLong(traceId, 16));
+            uuid = String.format("%0" + length + "d", Long.parseLong(uuid, 16));
         }
-        return traceId;
+        return uuid;
     }
 }
