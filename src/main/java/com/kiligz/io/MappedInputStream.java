@@ -55,6 +55,13 @@ public class MappedInputStream<T> extends AbstractMappedStream {
     }
 
     /**
+     * 是否还有元素
+     */
+    public boolean hasNext() {
+        return peek() != null;
+    }
+
+    /**
      * 读取一个对象
      */
     private T readObject() {

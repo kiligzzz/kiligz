@@ -20,9 +20,10 @@ public class Timing {
     /**
      * 开始计时
      */
-    public static void start() {
+    public static String start() {
         Instant start = Instant.now();
         THREAD_LOCAL_START.get().addFirst(start);
+        return "";
     }
 
     /**

@@ -6,6 +6,10 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Spring工具类
  *
@@ -24,18 +28,25 @@ public class SpringUtil implements ApplicationContextAware {
         context = applicationContext;
     }
 
-    /**
-     * 获取context
-     */
     public static ApplicationContext getContext() {
         return context;
     }
 
-    /**
-     * 获取bean
-     */
     public static <T> T getBean(Class<T> clazz) {
         return context.getBean(clazz);
+    }
+
+    public static Object getBean(String name) {
+        return context.getBean(name);
+    }
+
+    public static <T> T getBean(String name, Class<T> clazz) {
+        return context.getBean(name, clazz);
+    }
+
+    public static <T> List<T> getBeans(Class<T> clazz) {
+        Map<String, T> beanMap = context.getBeansOfType(clazz);
+        return new ArrayList<>(beanMap.values());
     }
 }
 

@@ -1,9 +1,6 @@
 package com.kiligz.concurrent;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.Setter;
+import lombok.*;
 
 import java.util.HashMap;
 import java.util.List;
@@ -25,19 +22,16 @@ import java.util.function.Supplier;
  * 3.ThreadLocal --- {@link #THREAD_LOCAL_MAP}
  *   - 支持创建、管理ThreadLocal及其值;
  *   - 若需在线程池中使用则依赖TransmittableThreadLocal，同时包装线程池
- * 4.数据任务封装 --- {@link #createDataTask}
- *   - 支持获取封装数据 & 对数据的操作 & 本次数据消费状态
- *   - 支持获取数据任务结束标记
- * 5.观察者模式生产消费数据 --- {@link #observer}
+ * 4.观察者模式生产消费数据 --- {@link #observer}
  *   - 支持简便的观察者模式生产和消费数据
  *   - 支持数据生产消费完毕后自动停止任务
  *   - 支持指定生产者消费者线程数
- * 6.线程池创建 --- {@link ThreadPool}
+ * 5.线程池创建 --- {@link ThreadPool}
  *   - 线程池使用;
  *   - CountDownLatch;
  *   - Support;
- * 7.当前map信息获取 --- {@link #infoThreadPoolMap}
- * 8.工具方法 --- {@link #getKey}
+ * 6.当前map信息获取 --- {@link #infoThreadPoolMap}
+ * 7.工具方法 --- {@link #getKey}
  *   - 支持获取一个在当前线程执行任务的Executor对象
  * </pre>
  *
@@ -197,92 +191,109 @@ public final class Concurrents {
 //                        new TransmittableThreadLocal<>() : TransmittableThreadLocal.withInitial(supplier));
 //    }
 
-    /*-------------------------------------------------------------------------*/
-    /*------------------------------ 数据任务封装 -------------------------------*/
-    /*-------------------------------------------------------------------------*/
-
-    /**
-     * 创建数据任务封装
-     */
-    public static <T> DataTask createDataTask(T data, Consumer<T> consumer) {
-        return new DataTask(data, (Consumer<Object>) consumer, false);
-    }
-
-    /**
-     * 数据任务封装的结束标记
-     */
-    public static DataTask endDataTask() {
-        return new DataTask(null, null, true);
-    }
-
-    /**
-     * 数据任务封装
-     */
-    @AllArgsConstructor
-    public static class DataTask {
-        private final Object data;
-        private final Consumer<Object> consumer;
-        @Getter
-        private final boolean isEnd;
-
-        public void exec() {
-            consumer.accept(data);
-        }
-
-        @Override
-        public String toString() {
-            return data.toString();
-        }
-    }
-
-
 
     /*-------------------------------------------------------------------------*/
     /*-------------------------- 观察者模式生产消费数据 ---------------------------*/
     /*-------------------------------------------------------------------------*/
 
     /**
-     * 观察者模式生产消费数据
+     * 观察者（生产-消费）模式封装
      */
-    public static <T> void observer(String name, Provider provider) {
-        observer(name, provider, 1, 1);
-    }
+    public static class Observer<T> {
+        private String name;
+        private Producer<T> producer;
+        private Consumer<T> consumer;
+        private int producerCount = 1;
+        private int consumerCount = 1;
 
-    /**
-     * 多线程观察者模式生产消费数据
-     */
-    public static void observer(String name, Provider provider,
-                                int providerCount, int consumerCount) {
-        LinkedTransferQueue<DataTask> queue = new LinkedTransferQueue<>();
-        refreshThreadShared(name, queue);
-        ThreadPool ptp = getFixedThreadPool(name + "-provider");
-        ThreadPool ctp = getFixedThreadPool(name + "-consumer");
-
-        ptp.execute(() -> provider.accept(queue), providerCount);
-        ctp.execute(() -> {
-            while (true) {
-                try {
-                    DataTask dataTask = queue.take();
-                    if (dataTask.isEnd()) return;
-                    dataTask.exec();
-                } catch (Exception e) {
-                    throw new RuntimeException("Consume data error. ", e);
-                }
-            }
-        }, consumerCount);
-
-        ptp.shutdown();
-        for (int i = 0; i < consumerCount; i++) {
-            queue.put(endDataTask());
+        private Observer(String name) {
+            this.name = name;
         }
-        ctp.shutdown();
-        refreshThreadShared(name, null);
+
+        public Observer<T> producer(Producer<T> producer) {
+            this.producer = producer;
+            return this;
+        }
+
+        public Observer<T> consumer(Consumer<T> consumer) {
+            this.consumer = consumer;
+            return this;
+        }
+
+        public Observer<T> producerCount(int producerCount) {
+            this.producerCount = producerCount;
+            return this;
+        }
+
+        public Observer<T> consumerCount(int consumerCount) {
+            this.consumerCount = consumerCount;
+            return this;
+        }
+
+        public void startup() {
+            LinkedTransferQueue<Task> queue = new LinkedTransferQueue<>();
+            refreshThreadShared(name, queue);
+            ThreadPool ptp = getFixedThreadPool(name + "-provider");
+            ThreadPool ctp = getFixedThreadPool(name + "-consumer");
+
+            ptp.execute(() -> {
+                producer.accept(data -> {
+                    try {
+                        queue.transfer(new Task(data, consumer, false));
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+            }, producerCount);
+
+            ctp.execute(() -> {
+                while (true) {
+                    try {
+                        Task task = queue.take();
+                        if (task.isEnd) return;
+                        task.exec();
+                    } catch (Exception e) {
+                        throw new RuntimeException("Consume data error. ", e);
+                    }
+                }
+            }, consumerCount);
+
+            ptp.shutdown();
+            for (int i = 0; i < consumerCount; i++) {
+                // 结束标记
+                queue.put(new Task(null, null, true));
+            }
+            ctp.shutdown();
+            refreshThreadShared(name, null);
+        }
+
+        /**
+         * 观察者模式生产者接口，需将生产的数据data加入到queue中
+         * csm -> csm.accept(data)
+         */
+        public static interface Producer<T> extends Consumer<Consumer<T>> {
+        }
+
+        /**
+         * 任务封装
+         */
+        @RequiredArgsConstructor
+        public static class Task<T> {
+            private final T data;
+            private final Consumer<T> consumer;
+            private final boolean isEnd;
+
+            private void exec() {
+                consumer.accept(data);
+            }
+        }
     }
 
     /**
-     * 观察者模式生产者接口
+     * 获取观察者（生产-消费）模式对象
      */
-    public static interface Provider extends Consumer<TransferQueue<DataTask>> {
+    public static <T> Observer<T> observer(String name) {
+        return new Observer<T>(name);
     }
 
 
