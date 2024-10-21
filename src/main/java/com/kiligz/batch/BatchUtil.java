@@ -26,8 +26,4 @@ public class BatchUtil {
                 .map(i -> list.subList(i, Math.min(i + batchSize, list.size())))
                 .collect(Collectors.toList());
     }
-
-    public static void main(String[] args) {
-
-    }
 }
