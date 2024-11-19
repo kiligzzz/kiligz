@@ -1,13 +1,18 @@
 package com.kiligz.io;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 
 /**
  * 文件工具类
  * <pre>
  * 1.支持级联获取、删除指定目录的所有文件、文件夹
+ * 2.支持获取文件名相关
+ * 3.支持获取文件md5值
  * </pre>
  *
  * @author Ivan
@@ -55,6 +60,50 @@ public class FileUtil {
             }
         }
         return true;
+    }
+
+    /**
+     * 获取文件所在目录
+     */
+    public static String getPrefixPath(String file) {
+        return file.substring(0, file.lastIndexOf(File.separator) + 1);
+    }
+
+    /**
+     * 获取文件名
+     */
+    public static String getName(String file) {
+        String name = getNameWithSuffix(file);
+        return name.substring(name.indexOf("."));
+    }
+
+    /**
+     * 获取文件名带后缀
+     */
+    public static String getNameWithSuffix(String file) {
+        String[] arr = file.split(File.separator);
+        return arr[arr.length - 1];
+    }
+
+    /**
+     * 计算文件md5值
+     */
+    public static String md5(String path) {
+        byte[] md5Hash;
+        String md5Str;
+        try (FileInputStream fis = new FileInputStream(path)) {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = fis.read(buffer)) > 0) {
+                md.update(buffer, 0, read);
+            }
+            md5Hash = md.digest();
+            md5Str = Base64.getEncoder().encodeToString(md5Hash);
+        } catch (Exception e) {
+            return "";
+        }
+        return md5Str;
     }
 
     /**

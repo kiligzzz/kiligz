@@ -679,7 +679,7 @@ public final class Concurrents {
     public static ThreadPoolExecutor newFixedThreadPool(String name) {
         return new ThreadPoolExecutor(corePoolSize, corePoolSize,
                 0, TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(corePoolSize * 10),
+                new LinkedTransferQueue<>(),
                 new NamedThreadFactory(name));
     }
 
@@ -689,7 +689,7 @@ public final class Concurrents {
     public static ThreadPoolExecutor newSingleThreadPool(String name) {
         return new ThreadPoolExecutor(1, 1,
                 0, TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(),
+                new LinkedTransferQueue<>(),
                 new NamedThreadFactory(name));
     }
 
