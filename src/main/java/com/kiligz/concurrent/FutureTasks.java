@@ -7,13 +7,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
  * future任务的处理
  * 支持CompletableFuture
+ * 支持控制任务执行速度，避免一下占用太多内存
  * 支持监控
  *
  * @author ivan.zhu
@@ -27,16 +27,37 @@ public class FutureTasks<T> {
     private static final int DEFAULT_PERIOD = 10;
     private static final int DEFAULT_BATCH = 1000;
 
+    /**
+     * 任务总数
+     */
     private final int total;
-    private final AtomicInteger finished;
+    /**
+     * 结果队列
+     */
     private final Queue<T> resQueue;
-    // 限制并发数
+    /**
+     * 限制并发数
+     */
     private final Semaphore semaphore;
-    // 等待任务执行完成
+    /**
+     * 等待任务执行完成
+     */
     private final CountDownLatch countDownLatch;
-    private final ScheduledExecutorService scheduler;
+    /**
+     * 任务名称
+     */
     private final String name;
-    // 异常处理
+    /**
+     * 默认定时打印执行状态
+     */
+    private ScheduledExecutorService scheduler;
+    /**
+     * 单任务完成打印执行状态和返回结果
+     */
+    private final boolean detailStatus;
+    /**
+     * 异常处理
+     */
     private final AtomicReference<Throwable> eRef = new AtomicReference<>();
 
 
@@ -45,25 +66,31 @@ public class FutureTasks<T> {
     }
 
     public FutureTasks(int total, String name) {
-        this(total, DEFAULT_BATCH, name, DEFAULT_PERIOD);
+        this(total, name, DEFAULT_PERIOD);
     }
 
     public FutureTasks(int total, String name, int period) {
-        this(total, DEFAULT_BATCH, name, period);
+        this(total, name, DEFAULT_BATCH, period, false);
+    }
+
+    public FutureTasks(int total, String name, boolean detailStatus) {
+        this(total, name, DEFAULT_BATCH, 0, detailStatus);
     }
 
     /**
-     * 输入总数和批处理个数，带监控的futureTasks，打印间隔，单位：s
+     * 输入总数和批处理个数，带监控的futureTasks，可打印详细信息或定时打印，单位：s
      */
-    public FutureTasks(int total, int batch, String name, int period) {
+    public FutureTasks(int total, String name, int batch, int period, boolean detailStatus) {
         this.total = total;
-        this.finished = new AtomicInteger();
         this.resQueue = new LinkedBlockingQueue<>();
         this.semaphore = new Semaphore(batch);
         this.countDownLatch = new CountDownLatch(total);
-        this.scheduler = new ScheduledThreadPoolExecutor(1);
         this.name = name;
-        this.scheduler.scheduleAtFixedRate(this::status, 0, period, TimeUnit.SECONDS);
+        this.detailStatus = detailStatus;
+        if (!detailStatus) {
+            this.scheduler = new ScheduledThreadPoolExecutor(1);
+            this.scheduler.scheduleAtFixedRate(this::status, 0, period, TimeUnit.SECONDS);
+        }
     }
 
     /**
@@ -80,9 +107,12 @@ public class FutureTasks<T> {
                 if (e != null) {
                     eRef.set(e);
                 }
-                finished.getAndIncrement();
                 semaphore.release();
                 countDownLatch.countDown();
+
+                if (detailStatus) {
+                    status(res);
+                }
             });
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -128,7 +158,7 @@ public class FutureTasks<T> {
                 checkException();
                 if (await || (isAny && countDownLatch.getCount() < total)) {
                     status();
-                    scheduler.shutdown();
+                    shutdownScheduler();
                     return resFunction.apply(resQueue);
                 }
             }
@@ -143,7 +173,7 @@ public class FutureTasks<T> {
     private void checkException() {
         Throwable e = eRef.get();
         if (e != null) {
-            scheduler.shutdown();
+            shutdownScheduler();
             log.error("===> [{}] exec error. ", name, e);
             throw new RuntimeException(e);
         }
@@ -153,46 +183,22 @@ public class FutureTasks<T> {
      * 监控信息
      */
     private void status() {
-        log.info("===> [{}] total tasks: {}, has finish: {}", name, total, finished.get());
+        log.info("===> [{}] finish tasks: {}/{}.", name, total - countDownLatch.getCount(), total);
     }
 
     /**
-     * future任务的处理
-     * 阉割版，支持Future
+     * 详细监控信息
      */
-    public static class LimitedFutureTasks<T> {
-        List<Future<T>> futureList = new ArrayList<>();
+    private void status(T res) {
+        log.info("===> [{}] finish tasks: {}/{}. res: {}", name, total - countDownLatch.getCount(), total, res);
+    }
 
-        public void add(Future<T> future) {
-            futureList.add(future);
-        }
-
-        public void awaitAll() {
-            getAll();
-        }
-
-        public void awaitAny() {
-            getAny();
-        }
-
-        public List<T> getAll() {
-            try {
-                List<T> res = new ArrayList<>();
-                for (Future<T> future : futureList) {
-                    res.add(future.get());
-                }
-                return res;
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public T getAny() {
-            try {
-                return futureList.get(ThreadLocalRandom.current().nextInt(futureList.size())).get();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+    /**
+     * 关闭定时器
+     */
+    private void shutdownScheduler() {
+        if (scheduler != null) {
+            scheduler.shutdown();
         }
     }
 }

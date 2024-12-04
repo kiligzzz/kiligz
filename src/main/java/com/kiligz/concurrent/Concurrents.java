@@ -3,7 +3,6 @@ package com.kiligz.concurrent;
 import lombok.*;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -30,7 +29,7 @@ import java.util.function.Supplier;
  *   - 线程池使用;
  *   - CountDownLatch;
  *   - Support;
- * 6.当前map信息获取 --- {@link #infoThreadPoolMap}
+ * 6.当前线程池状态获取 --- {@link #infoThreadPoolMap}
  * 7.工具方法 --- {@link #getKey}
  *   - 支持获取一个在当前线程执行任务的Executor对象
  * </pre>
@@ -383,7 +382,7 @@ public final class Concurrents {
         /**
          * 添加一个任务到线程池中执行，返回Future
          */
-        public <T> RunnableFuture<T> submit(@NonNull Callable<T> task) {
+        public <T> RunnableFuture<T> submitTask(@NonNull Callable<T> task) {
             RunnableFuture<T> runnableFuture = new FutureTaskDecorator<>(task);
             latchMap.put(runnableFuture, new CountDownLatch(1));
 
@@ -392,79 +391,17 @@ public final class Concurrents {
         }
 
         /**
-         * 添加一组任务到线程池执行，返回一组Future
+         * 添加一组任务到线程池中执行，返回CompletableFuture，通过FutureTasks处理并保存状态
          */
-        public <T> List<Future<T>> invokeAll(@NonNull List<Callable<T>> taskList) {
-            try {
-                return executor.invokeAll(taskList);
-            } catch (InterruptedException e) {
-                throw new RuntimeException("Interrupted exception while invoke all task", e);
-            }
-        }
-
-        /**
-         * 添加一组任务到线程池执行，任意一个任务返回结果
-         */
-        public <T> T invokeAny(@NonNull List<Callable<T>> taskList) {
-            try {
-                return executor.invokeAny(taskList);
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException("Interrupted or execution exception while invoke any task", e);
-            }
-        }
-
-        /**
-         * 添加一个任务到线程池中，一定延时后执行，返回原始task，可用来await
-         */
-        public Runnable schedule(@NonNull Runnable task, long delay, @NonNull TimeUnit unit) {
-            try {
-                latchMap.put(task, new CountDownLatch(1));
-
-                ((ScheduledThreadPoolExecutor) executor).schedule(
-                        decorate(task), delay, unit);
-            } catch (ClassCastException e) {
-                throw new RuntimeException("This threadPool is not a scheduledThreadPool, please checked it", e);
-            }
-            return task;
-        }
-
-        /**
-         * 添加taskCount个任务到线程池中，一定延时后执行，返回原始task，可用来await
-         */
-        public Runnable schedule(@NonNull Runnable task, int taskCount, long delay, @NonNull TimeUnit unit) {
-            try {
-                latchMap.put(task, new CountDownLatch(taskCount));
-
-                Runnable decorator = decorate(task);
-                ScheduledThreadPoolExecutor scheduledThreadPool = (ScheduledThreadPoolExecutor) executor;
-                for (int i = 0; i < taskCount; i++) {
-                    scheduledThreadPool.schedule(decorator, delay, unit);
-                }
-            } catch (ClassCastException e) {
-                throw new RuntimeException("This threadPool is not a scheduledThreadPool, please checked it", e);
-            }
-            return task;
-        }
-
-        /**
-         * 添加一个任务到线程池中，一定延时之后定时执行，返回原始task，可用来await
-         */
-        public Runnable scheduleAtFixedRate(@NonNull Runnable task, long delay, long period, @NonNull TimeUnit unit) {
-            try {
-                latchMap.put(task, new CountDownLatch(1));
-
-                ((ScheduledThreadPoolExecutor) executor).scheduleAtFixedRate(
-                        decorate(task), delay, period, unit);
-            } catch (ClassCastException e) {
-                throw new RuntimeException("This threadPool is not a scheduledThreadPool, please checked it", e);
-            }
-            return task;
+        public <T> CompletableFuture<T> submit(@NonNull Supplier<T> task) {
+            return CompletableFuture.supplyAsync(task, executor);
         }
 
         /**
          * 添加taskCount个任务到线程池中，一定延时后定时执行，返回原始task，可用来await
+         * period为0时，只执行一次
          */
-        public Runnable scheduleAtFixedRate(@NonNull Runnable task, int taskCount, long delay, long period, @NonNull TimeUnit unit) {
+        public Runnable schedule(@NonNull Runnable task, int taskCount, long delay, long period, @NonNull TimeUnit unit) {
             try {
                 latchMap.put(task, new CountDownLatch(taskCount));
 
