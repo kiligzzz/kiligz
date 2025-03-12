@@ -1,6 +1,6 @@
 package com.kiligz.concurrent;
 
-import lombok.Data;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -19,8 +19,8 @@ import java.util.function.Function;
  * @author ivan.zhu
  * @since 2024/7/3
  */
-@Data
 @Slf4j
+@Getter
 @SuppressWarnings("all")
 public class FutureTasks<T> {
     private static final String DEFAULT_NAME = "futureTasks";
@@ -36,45 +36,36 @@ public class FutureTasks<T> {
      */
     private final Queue<T> resQueue;
     /**
-     * 限制并发数
-     */
-    private final Semaphore semaphore;
-    /**
      * 等待任务执行完成
      */
     private final CountDownLatch countDownLatch;
     /**
      * 任务名称
      */
-    private final String name;
+    private String name;
+    /**
+     * 限制并发数
+     */
+    private Semaphore semaphore;
+    /**
+     * 单任务完成打印执行状态和返回结果
+     */
+    private boolean detailStatus;
     /**
      * 默认定时打印执行状态
      */
     private ScheduledExecutorService scheduler;
     /**
-     * 单任务完成打印执行状态和返回结果
-     */
-    private final boolean detailStatus;
-    /**
      * 异常处理
      */
     private final AtomicReference<Throwable> eRef = new AtomicReference<>();
 
-
     public FutureTasks(int total) {
-        this(total, DEFAULT_NAME, DEFAULT_PERIOD);
+        this(total, DEFAULT_NAME);
     }
 
     public FutureTasks(int total, String name) {
-        this(total, name, DEFAULT_PERIOD);
-    }
-
-    public FutureTasks(int total, String name, int period) {
-        this(total, name, DEFAULT_BATCH, period, false);
-    }
-
-    public FutureTasks(int total, String name, boolean detailStatus) {
-        this(total, name, DEFAULT_BATCH, 0, detailStatus);
+        this(total, name, DEFAULT_BATCH, DEFAULT_PERIOD, false);
     }
 
     /**
@@ -91,6 +82,30 @@ public class FutureTasks<T> {
             this.scheduler = new ScheduledThreadPoolExecutor(1);
             this.scheduler.scheduleAtFixedRate(this::status, 0, period, TimeUnit.SECONDS);
         }
+    }
+
+    /**
+     * 设置批处理个数
+     */
+    public void setBatch(int batch) {
+        semaphore = new Semaphore(batch);
+    }
+
+    /**
+     * 设置打印日志周期
+     */
+    public void setPeriod(int period) {
+        shutdownScheduler();
+        scheduler = new ScheduledThreadPoolExecutor(1);
+        scheduler.scheduleAtFixedRate(this::status, 0, period, TimeUnit.SECONDS);
+    }
+
+    /**
+     * 开启详细输出
+     */
+    public void openDetail() {
+        shutdownScheduler();
+        detailStatus = true;
     }
 
     /**

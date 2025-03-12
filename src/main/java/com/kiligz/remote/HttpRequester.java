@@ -4,7 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -13,7 +16,6 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,9 +35,9 @@ public class HttpRequester {
      */
     public static <T> T get(String url, HttpParams params, HttpResponse.BodyHandler<T> handler) {
         try {
-            ContentType contentType = ContentType.FORM;
+            ReqType reqType = ReqType.FORM;
             if (!params.isEmpty()) {
-                url += "?" + contentType.toBody(params);
+                url += "?" + reqType.toBody(params);
             }
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -56,15 +58,15 @@ public class HttpRequester {
     /**
      * 发送post请求，并指定content类型以及resp处理方式
      */
-    public static <T> T post(String url, HttpParams params, ContentType contentType, HttpResponse.BodyHandler<T> handler) {
+    public static <T> T post(String url, HttpParams params, ReqType reqType, RespType<T> respType) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("Content-Type", contentType.desc)
-                    .POST(HttpRequest.BodyPublishers.ofString(contentType.toBody(params)))
+                    .header("Content-Type", reqType.desc)
+                    .POST(reqType.toBody(params))
                     .timeout(Duration.ofHours(1))
                     .build();
-            HttpResponse<T> resp = HTTP_CLIENT.send(request, handler);
+            HttpResponse<T> resp = HTTP_CLIENT.send(request, respType.handler);
             if (resp.statusCode() == 200) {
                 return resp.body();
             } else {
@@ -75,61 +77,88 @@ public class HttpRequester {
         }
     }
 
-    public static HttpResponse.BodyHandler<String> strRespHandler() {
-        return HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8);
-    }
-
-    public static HttpResponse.BodyHandler<Path> fileRespHandler(Path path) {
-        return HttpResponse.BodyHandlers.ofFile(path);
-    }
-
+    /**
+     * 请求类型
+     */
     @AllArgsConstructor
-    public enum ContentType {
+    public enum ReqType {
         JSON("application/json") {
             @Override
-            public String toBody(HttpParams params) throws Exception {
-                return MAPPER.writeValueAsString(params.getParams());
+            public HttpRequest.BodyPublisher toBody(HttpParams params) throws Exception {
+                return HttpRequest.BodyPublishers.ofString(MAPPER.writeValueAsString(params.getParams()));
             }
         },
         FORM("application/x-www-form-urlencoded") {
             @Override
-            public String toBody(HttpParams params) {
-                return params.getParams()
+            public HttpRequest.BodyPublisher toBody(HttpParams params) {
+                String paramsStr = params.getParams()
                         .entrySet()
                         .stream()
                         .map(entry -> URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8) + "=" + URLEncoder.encode(entry.getValue().toString(), StandardCharsets.UTF_8))
                         .collect(Collectors.joining("&"));
+                return HttpRequest.BodyPublishers.ofString(paramsStr);
             }
         },
         FILE("multipart/form-data; boundary=---boundary") {
             @Override
-            public String toBody(HttpParams params) throws Exception {
-                String filePath = params.getFilePath();
-
+            public HttpRequest.BodyPublisher toBody(HttpParams params) throws Exception {
                 String boundary = "---boundary";
-                byte[] bytes = Files.readAllBytes(Paths.get(filePath));
+                String filePath = params.getFilePath();
+                File file = new File(filePath);
+                byte[] fileBytes = Files.readAllBytes(file.toPath());
 
-                StringBuilder body = new StringBuilder();
-                body.append("--").append(boundary).append("\r\n");
-                body.append("Content-Disposition: form-data; name=\"file\"; filename=\"").append(new File(filePath).getName()).append("\"\r\n")
-                        .append("Content-Type: application/octet-stream\r\n\r\n");
-                body.append(new String(bytes)).append("\r\n");
-                params.getParams().forEach((k, v) -> body.append("--").append(boundary).append("\r\n")
-                        .append("Content-Disposition: form-data; name=\"").append(k).append("\"\r\n\r\n")
-                        .append(v).append("\r\n"));
-                body.append("--").append(boundary).append("--\r\n");
-                return body.toString();
+                ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+                DataOutputStream dataStream = new DataOutputStream(byteStream);
+
+                // 添加文件部分
+                dataStream.writeBytes("--" + boundary + "\r\n");
+                dataStream.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"" + file.getName() + "\"\r\n");
+                dataStream.writeBytes("Content-Type: application/octet-stream\r\n\r\n");
+                dataStream.write(fileBytes);
+                dataStream.writeBytes("\r\n");
+
+                // 添加其他参数
+                params.getParams().forEach((key, value) -> {
+                    try {
+                        dataStream.writeBytes("--" + boundary + "\r\n");
+                        dataStream.writeBytes("Content-Disposition: form-data; name=\"" + key + "\"\r\n\r\n");
+                        dataStream.writeBytes(value + "\r\n");
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+
+                // 结束边界
+                dataStream.writeBytes("--" + boundary + "--\r\n");
+                dataStream.flush();
+
+                return HttpRequest.BodyPublishers.ofByteArray(byteStream.toByteArray());
             }
         };
         private static final ObjectMapper MAPPER = new ObjectMapper();
 
         private final String desc;
 
-        public abstract String toBody(HttpParams params) throws Exception;
+        public abstract HttpRequest.BodyPublisher toBody(HttpParams params) throws Exception;
     }
 
     /**
-     * http参数
+     * 返回类型
+     */
+    @AllArgsConstructor
+    public static class RespType<T> {
+
+        HttpResponse.BodyHandler<T> handler;
+
+        public static final RespType<String> STRING = new RespType<>(
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        public static RespType<Path> FILE(Path path) {
+            return new RespType<>(HttpResponse.BodyHandlers.ofFile(path));
+        }
+    }
+
+    /**
+     * 请求参数
      */
     @Getter
     public static class HttpParams {
@@ -138,6 +167,7 @@ public class HttpRequester {
 
         private HttpParams() {
         }
+
         public static HttpParams build(String filePath) {
             return new HttpParams().add(filePath);
         }

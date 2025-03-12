@@ -19,11 +19,13 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 public class RetryUtil {
+    private static final int DEFAULT_RETRY_TIMES = 3;
+
     /**
-     * 出现异常重试，默认10次，立即重试
+     * 出现异常重试，默认3次，立即重试
      */
     public static <T> T retry(Callable<T> callable) {
-        return retry(10, 0, callable);
+        return retry(DEFAULT_RETRY_TIMES, 0, callable);
     }
 
     /**
@@ -49,7 +51,7 @@ public class RetryUtil {
      * 根据结果重试，默认10次，立即重试
      */
     public static <T> T retry(Callable<T> callable, Predicate<T> predicate) {
-        return retry(10, 0, callable, predicate);
+        return retry(DEFAULT_RETRY_TIMES, 0, callable, predicate);
     }
 
     /**
