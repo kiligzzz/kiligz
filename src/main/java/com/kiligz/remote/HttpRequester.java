@@ -33,7 +33,7 @@ public class HttpRequester {
     /**
      * 发送get请求，并指定resp处理方式
      */
-    public static <T> T get(String url, HttpParams params, HttpResponse.BodyHandler<T> handler) {
+    public static <T> T get(String url, HttpParams params, RespType<T> respType) {
         try {
             ReqType reqType = ReqType.FORM;
             if (!params.isEmpty()) {
@@ -44,7 +44,7 @@ public class HttpRequester {
                     .GET()
                     .timeout(Duration.ofHours(1))
                     .build();
-            HttpResponse<T> resp = HTTP_CLIENT.send(request, handler);
+            HttpResponse<T> resp = HTTP_CLIENT.send(request, respType.handler);
             if (resp.statusCode() == 200) {
                 return resp.body();
             } else {
@@ -56,7 +56,7 @@ public class HttpRequester {
     }
 
     /**
-     * 发送post请求，并指定content类型以及resp处理方式
+     * 发送post请求，并指定req类型以及resp处理方式
      */
     public static <T> T post(String url, HttpParams params, ReqType reqType, RespType<T> respType) {
         try {
