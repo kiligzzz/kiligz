@@ -21,11 +21,13 @@ import java.util.concurrent.TimeUnit;
 public class RetryUtil {
     private static final int DEFAULT_RETRY_TIMES = 3;
 
+    private static final int DEFAULT_RETRY_INTERVAL = 1;
+
     /**
-     * 出现异常重试，默认3次，立即重试
+     * 出现异常重试，默认3次，间隔1s，立即重试
      */
     public static <T> T retry(Callable<T> callable) {
-        return retry(DEFAULT_RETRY_TIMES, 0, callable);
+        return retry(DEFAULT_RETRY_TIMES, DEFAULT_RETRY_INTERVAL, callable);
     }
 
     /**
